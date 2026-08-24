@@ -123,6 +123,21 @@ class SourceSpawnModule extends ArenaModule {
         this.stepInterval = 0.2;
     }
 
+    affectParticle(particle, dt) {
+        // Cross-conversion rule: Particles entering an opposing source's box adopt its properties
+        if (particle.sourceId !== this.id) {
+            const inX = particle.x >= this.x && particle.x <= this.x + this.width;
+            const inY = particle.y >= this.y && particle.y <= this.y + this.height;
+
+            if (inX && inY) {
+                particle.sourceId = this.id;
+                particle.color = this.engine.intrinsicColor;
+                particle.originHash = this.engine.originHash;
+                particle.currentHash = this.engine.currentHash;
+            }
+        }
+    }
+
     update(dt, arena) {
         // Do not update or emit if engine has reached its terminal/halt state
         if (!this.engine.isActive) return;
@@ -184,12 +199,21 @@ class SourceSpawnModule extends ArenaModule {
         super.draw(ctx);
         const c = this.center;
         ctx.save();
+        ctx.strokeStyle = this.engine.intrinsicColor;
         ctx.fillStyle = this.engine.intrinsicColor;
         ctx.shadowBlur = 8;
         ctx.shadowColor = this.engine.intrinsicColor;
+
         ctx.beginPath();
         ctx.arc(c.x, c.y, 6, 0, Math.PI * 2);
-        ctx.fill();
+
+        // Filled dot while active, hollow ring shell when halted/inactive
+        if (this.engine.isActive) {
+            ctx.fill();
+        } else {
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
 
         ctx.font = '9px monospace';
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
