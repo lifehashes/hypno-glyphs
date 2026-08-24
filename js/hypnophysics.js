@@ -11,10 +11,12 @@ class Particle {
         this.ax = 0;
         this.ay = 0;
         this.charge = charge;
+        this.chargeVal = 0; // Electrical charge: -4 to +4
         this.color = color;
         this.life = 1.0;
         this.dead = false;
-        this.isAnti = false; // QCD Inversion state flag
+        this.isAnti = false;
+        this.ringRotation = 0; // Rotation angle for animated shell spinning
     }
 
     update(dt) {
@@ -25,6 +27,12 @@ class Particle {
 
         this.ax = 0;
         this.ay = 0;
+
+        // Rotate concentric rings: Clockwise for positive, Counter-clockwise for negative
+        if (this.chargeVal !== 0) {
+            const dir = Math.sign(this.chargeVal);
+            this.ringRotation += dir * dt * 4;
+        }
     }
 
     draw(ctx) {
@@ -40,9 +48,29 @@ class Particle {
 
         if (this.isAnti) {
             ctx.lineWidth = 1.2;
-            ctx.stroke(); // Render hollow ring for anti-particle
+            ctx.stroke();
         } else {
-            ctx.fill();   // Render solid sphere for normal particle
+            ctx.fill();
+        }
+
+        // Render thin concentric shells based on absolute charge value
+        const numRings = Math.abs(this.chargeVal);
+        if (numRings > 0) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.ringRotation);
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = this.chargeVal > 0 ? '#00e1ff' : '#ff3366'; // Blue (+) / Red (-)
+
+            for (let r = 1; r <= numRings; r++) {
+                const ringRadius = 3.5 + r * 2.2;
+                ctx.beginPath();
+                // Draw thin arc shells with gaps to make rotation visible
+                ctx.arc(0, 0, ringRadius, 0, Math.PI * 1.5);
+                ctx.stroke();
+            }
+            ctx.restore();
         }
 
         ctx.restore();
@@ -322,6 +350,7 @@ class ArenaManager {
 
         // 1. Update Modules
         this.modules.forEach(mod => mod.update(dt, this));
+        this.handleElectrostaticInteractions();
 
         // 2. Physics pass on Particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -455,6 +484,45 @@ class ArenaManager {
             }
         }
     }
+
+    handleElectrostaticInteractions() {
+        const interactionRadius = 45; // Short-range cutoff distance
+        const cutoffSq = interactionRadius * interactionRadius;
+        const coulombConstant = 18000;
+        const len = this.particles.length;
+
+        for (let i = 0; i < len; i++) {
+            const p1 = this.particles[i];
+            if (p1.dead || p1.chargeVal === 0) continue;
+
+            for (let j = i + 1; j < len; j++) {
+                const p2 = this.particles[j];
+                if (p2.dead || p2.chargeVal === 0) continue;
+
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const distSq = dx * dx + dy * dy;
+
+                if (distSq < cutoffSq && distSq > 16) {
+                    const dist = Math.sqrt(distSq);
+                    
+                    // Coulomb's Law (F = k * q1 * q2 / r^2)
+                    // Positive force = Repulsion (like charges), Negative force = Attraction (opposite charges)
+                    const forceMagnitude = (coulombConstant * p1.chargeVal * p2.chargeVal) / distSq;
+
+                    const fx = (dx / dist) * forceMagnitude;
+                    const fy = (dy / dist) * forceMagnitude;
+
+                    // Impart equal and opposite acceleration forces
+                    p1.ax -= fx;
+                    p1.ay -= fy;
+                    p2.ax += fx;
+                    p2.ay += fy;
+                }
+            }
+        }
+    }
+
 }
 
 /**
@@ -703,6 +771,135 @@ class DoublerModule extends ArenaModule {
         ctx.font = '9px monospace';
         ctx.fillStyle = '#ffbb00';
         ctx.fillText('DOUBLER', this.x + 16, this.y + 12);
+        ctx.restore();
+    }
+}
+
+/**
+ * Charger Module
+ * Imbues positive or negative electrical charge to passing particles (capped at +/-4).
+ */
+class ChargerModule extends ArenaModule {
+    constructor(id, x, y, width = 70, height = 70, polarity = 1) {
+        super(id, x, y, width, height, 'CHARGER');
+        this.polarity = Math.sign(polarity) || 1; // +1 or -1
+        this.radius = Math.min(width, height) / 2;
+        this.activeParticles = new Set();
+    }
+
+    affectParticle(particle, dt) {
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+        const inZone = distSq <= (this.radius * 0.7) ** 2;
+
+        if (inZone) {
+            if (!this.activeParticles.has(particle)) {
+                // Adjust charge state and clamp to max limit [-4, 4]
+                particle.chargeVal = Math.min(4, Math.max(-4, particle.chargeVal + this.polarity));
+                this.activeParticles.add(particle);
+            }
+        } else {
+            this.activeParticles.delete(particle);
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        const isPos = this.polarity > 0;
+        const color = isPos ? '#00e1ff' : '#ff3366';
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = color;
+        ctx.lineWidth = 1.5;
+
+        // Visual field boundary
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Polarity Symbol
+        ctx.fillStyle = color;
+        ctx.font = 'bold 16px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isPos ? '+' : '−', c.x, c.y);
+
+        ctx.font = '9px monospace';
+        ctx.fillStyle = color;
+        ctx.fillText(isPos ? '+CHARGER' : '-CHARGER', this.x + (isPos ? 10 : 12), this.y + 12);
+        ctx.restore();
+    }
+}
+
+/**
+ * Capacitor Module
+ * Carries a strong fixed electrical charge and attracts/repels charged particles.
+ */
+class CapacitorModule extends ArenaModule {
+    constructor(id, x, y, width = 70, height = 70, chargeVal = 2, strength = 18000) {
+        super(id, x, y, width, height, 'CAPACITOR');
+        this.chargeVal = chargeVal; // Fixed charge (+ / -)
+        this.strength = strength;   // Force scaling multiplier
+        this.radius = Math.min(width, height) / 2;
+    }
+
+    affectParticle(particle, dt) {
+        // Skip neutral particles
+        if (particle.chargeVal === 0) return;
+
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = Math.max(100, dx * dx + dy * dy); // Clamp minimum distance
+        const dist = Math.sqrt(distSq);
+
+        // Electrostatic force calculation: F = (k * q1 * q2) / r^2
+        // Repels like charges, attracts opposite charges
+        const forceMagnitude = (this.strength * this.chargeVal * particle.chargeVal) / distSq;
+
+        particle.ax += (dx / dist) * forceMagnitude;
+        particle.ay += (dy / dist) * forceMagnitude;
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        const isPos = this.chargeVal > 0;
+        const color = isPos ? '#00e1ff' : '#ff3366';
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = color;
+
+        // Double parallel plate visual
+        const hw = this.width * 0.25;
+        const hh = this.height * 0.25;
+        
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Left plate
+        ctx.moveTo(c.x - hw, c.y - hh);
+        ctx.lineTo(c.x - hw, c.y + hh);
+        // Right plate
+        ctx.moveTo(c.x + hw, c.y - hh);
+        ctx.lineTo(c.x + hw, c.y + hh);
+        ctx.stroke();
+
+        // Polarity Label
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isPos ? '+' : '−', c.x, c.y);
+
+        ctx.font = '9px monospace';
+        ctx.fillText('CAPACITOR', this.x + 8, this.y + 12);
         ctx.restore();
     }
 }

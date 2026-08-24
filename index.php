@@ -250,7 +250,12 @@
 
         // 5. Add Doublers above and below QCD Inverters
         arena.addModule(new DoublerModule('doubler_top', centerX - horizontalOffset, centerY - verticalOffset, modWidth, modHeight));
-        arena.addModule(new DoublerModule('doubler_bottom', centerX + horizontalOffset, centerY + verticalOffset, modWidth, modHeight));        
+        arena.addModule(new DoublerModule('doubler_bottom', centerX + horizontalOffset, centerY + verticalOffset, modWidth, modHeight));  
+        
+        // Place +CHARGER and -CHARGER modules on the arena grid
+        arena.addModule(new ChargerModule('charger_pos', centerX - horizontalOffset, centerY + verticalOffset, modWidth, modHeight, +1));
+        arena.addModule(new ChargerModule('charger_neg', centerX + horizontalOffset, centerY - verticalOffset, modWidth, modHeight, -1));
+
     }
 
     function getRandomBinary(length) {
