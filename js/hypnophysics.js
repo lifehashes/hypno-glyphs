@@ -550,7 +550,7 @@ class ArenaManager {
 }
 
 /**
- * Sink / Drain Module (Destroys particles & increments/decrements score for emitter)
+ * Sink / Drain Module (Destroys particles & increments/decrements score based on charge magnitude)
  */
 class SinkModule extends ArenaModule {
     constructor(id, x, y, width = 70, height = 70, scoreTracker) {
@@ -569,8 +569,10 @@ class SinkModule extends ArenaModule {
         if (distSq <= (this.radius * 0.8) ** 2) {
             particle.dead = true;
 
-            // Anti-particles subtract 1 point; normal particles add 1 point
-            const delta = particle.isAnti ? -1 : 1;
+            // Score magnitude scale: base value modified by absolute charge magnitude |chargeVal|
+            const chargeMagnitude = Math.abs(particle.chargeVal);
+            const scoreMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
+            const delta = (particle.isAnti ? -1 : 1) * scoreMultiplier;
 
             if (particle.sourceId === 'alpha_src') {
                 this.scoreTracker.alphaScore += delta;
