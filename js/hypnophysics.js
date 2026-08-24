@@ -81,21 +81,22 @@ class ArenaModule {
 class SourceSpawnModule extends ArenaModule {
     constructor(id, x, y, width, height, lifeEngine, label = 'EMITTER') {
         super(id, x, y, width, height, 'SOURCE_SPAWN');
-        this.engine = lifeEngine; // Connected GOL engine instance
+        this.engine = lifeEngine;
         this.label = label;
         this.stepTimer = 0;
-        this.stepInterval = 0.2; // GOL tick speed (seconds)
+        this.stepInterval = 0.2;
     }
 
     update(dt, arena) {
+        // Do not update or emit if engine has reached its terminal/halt state
+        if (!this.engine.isActive) return;
+
         this.stepTimer += dt;
         if (this.stepTimer >= this.stepInterval) {
             this.stepTimer = 0;
 
-            // Check active cells
             const activeCount = this.engine.getPopulationCount();
             
-            // Eject particle if active cells exist
             if (activeCount > 0) {
                 const c = this.center;
                 const speed = 50 + (activeCount * 2); 
@@ -107,24 +108,19 @@ class SourceSpawnModule extends ArenaModule {
 
                 const p = new Particle(c.x, c.y, vx, vy, 1.0, color);
                 p.sourceId = this.id; 
-                
-                // Assign active hashes directly to the particle for future physical attributes
                 p.originHash = this.engine.originHash;
                 p.currentHash = this.engine.currentHash;
 
                 arena.addParticle(p);
             }
 
-            // Always step internal engine to compute new hash state
-            if (this.engine.isActive) {
-                this.engine.computeNextGeneration();
-            }
+            // Advance state
+            this.engine.computeNextGeneration();
         }
     }
 
     draw(ctx) {
         super.draw(ctx);
-        // Draw emitter node indicator
         const c = this.center;
         ctx.save();
         ctx.fillStyle = this.engine.intrinsicColor;

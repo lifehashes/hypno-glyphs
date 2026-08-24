@@ -161,18 +161,18 @@
     function loadInitialGlyphs() {
         if (databaseGlyphs.length > 0) {
             const alphaData = databaseGlyphs[0];
-            alphaEngine.loadFromBinary(alphaData.BIN);
+            alphaEngine.loadFromBinary(alphaData.BIN, parseInt(alphaData.GENERATIONS) || 500);
             document.getElementById('alpha-name').innerText = alphaData.BATTLE_NAME;
         } else {
-            alphaEngine.loadFromBinary(getRandomBinary(256));
+            alphaEngine.loadFromBinary(getRandomBinary(256), 500);
         }
 
         if (databaseGlyphs.length > 1) {
             const betaData = databaseGlyphs[1];
-            betaEngine.loadFromBinary(betaData.BIN);
+            betaEngine.loadFromBinary(betaData.BIN, parseInt(betaData.GENERATIONS) || 500);
             document.getElementById('beta-name').innerText = betaData.BATTLE_NAME;
         } else {
-            betaEngine.loadFromBinary(getRandomBinary(256));
+            betaEngine.loadFromBinary(getRandomBinary(256), 500);
         }
 
         // Color metadata
@@ -182,14 +182,11 @@
         document.getElementById('beta-color').style.color  = betaEngine.intrinsicColor;
         document.getElementById('beta-color').innerText    = betaEngine.intrinsicColor.toUpperCase();
 
-        // Register Source/Spawn Modules into the Arena
+        // Register Source/Spawn Modules
         arena.addModule(new SourceSpawnModule('alpha_src', 0, 0, 70, 70, alphaEngine, 'ALPHA'));
         arena.addModule(new SourceSpawnModule('beta_src', 0, 0, 70, 70, betaEngine, 'BETA'));
-
-        // Add a non-GOL Physics Attractor module to demonstrate physics interactions
         arena.addModule(new AttractorModule('gravity_well_1', 0, 0, 70, 70, 8000));
 
-        // Arrange modules automatically
         arena.layoutGrid(4, 20, 75, 75);
     }
 
@@ -216,17 +213,15 @@
 
     // Update stats panel inside the main render/loop function
     function updateHUD() {
-        // 1. Update Generation Readouts
-        document.getElementById('alpha-gen').innerText = `${alphaEngine.iteration} / 500`;
-        document.getElementById('beta-gen').innerText  = `${betaEngine.iteration} / 500`;
+        // Dynamic max generations display
+        document.getElementById('alpha-gen').innerText = `${alphaEngine.iteration} / ${alphaEngine.maxGenerations}`;
+        document.getElementById('beta-gen').innerText  = `${betaEngine.iteration} / ${betaEngine.maxGenerations}`;
 
-        // 2. Update Active Particle Counters
         const alphaCount = arena.particles.filter(p => p.sourceId === 'alpha_src').length;
         const betaCount  = arena.particles.filter(p => p.sourceId === 'beta_src').length;
         document.getElementById('alpha-particles').innerText = alphaCount;
         document.getElementById('beta-particles').innerText  = betaCount;
 
-        // 3. Update Hash Display
         document.getElementById('alpha-origin-hash').innerText  = alphaEngine.originHash  || '-';
         document.getElementById('alpha-current-hash').innerText = alphaEngine.currentHash || '-';
         document.getElementById('beta-origin-hash').innerText   = betaEngine.originHash   || '-';
