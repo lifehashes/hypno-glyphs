@@ -165,6 +165,13 @@
             <span id="gravity-val">10000</span>
         </div>
 
+        <!-- Capacitor Strength Slider -->
+        <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
+            <label for="capacitor-slider">CAPACITOR FORCE:</label>
+            <input type="range" id="capacitor-slider" min="0" max="100000" step="5000" value="18000" oninput="updateCapacitorStrength(this.value)">
+            <span id="capacitor-val">18000</span>
+        </div>
+
         <!-- Boundary Mode Selector Button -->
         <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>
 
@@ -255,6 +262,12 @@
         // Place +CHARGER and -CHARGER modules on the arena grid
         arena.addModule(new ChargerModule('charger_pos', centerX - horizontalOffset, centerY + verticalOffset, modWidth, modHeight, +1));
         arena.addModule(new ChargerModule('charger_neg', centerX + horizontalOffset, centerY - verticalOffset, modWidth, modHeight, -1));
+
+        // Place Positive and Negative Capacitors into the Arena grid
+        const currentCapacitorStrength = parseFloat(document.getElementById('capacitor-slider').value) || 18000;
+
+        arena.addModule(new CapacitorModule('cap_pos', centerX - horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 4, currentCapacitorStrength));
+        arena.addModule(new CapacitorModule('cap_neg', centerX + horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, -4, currentCapacitorStrength));
 
     }
 
@@ -388,6 +401,17 @@
         const bottomWell = arena.modules.get('gravity_bottom');
         if (topWell) topWell.strength = val;
         if (bottomWell) bottomWell.strength = val;
+    }
+
+    function updateCapacitorStrength(value) {
+        const val = parseFloat(value);
+        document.getElementById('capacitor-val').innerText = val;
+
+        arena.modules.forEach(mod => {
+            if (mod.type === 'CAPACITOR') {
+                mod.strength = val;
+            }
+        });
     }
 
     function cycleBoundaryMode() {
