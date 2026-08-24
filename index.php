@@ -143,6 +143,14 @@
 
     <div class="controls-bar">
         <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">ENGAGE ENGINE</button>
+        
+        <!-- Gravity Slider -->
+        <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
+            <label for="gravity-slider">GRAVITY WELL:</label>
+            <input type="range" id="gravity-slider" min="-20000" max="40000" step="1000" value="8000" oninput="updateGravity(this.value)">
+            <span id="gravity-val">8000</span>
+        </div>
+
         <button class="help-btn" onclick="clearArena()">CLEAR ARENA</button>
     </div>
 </div>
@@ -269,6 +277,18 @@
     function randomizeSource(source) {
         console.log(`Randomizing ${source} seed...`);
     }
+
+    function updateGravity(value) {
+        const val = parseFloat(value);
+        document.getElementById('gravity-val').innerText = val;
+
+        // Grab the attractor module and update its strength directly
+        const well = arena.modules.get('gravity_well_1');
+        if (well) {
+            well.strength = val;
+        }
+    }
+
 </script>
 
 </body>
