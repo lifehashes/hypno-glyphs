@@ -458,7 +458,7 @@ class ArenaManager {
 }
 
 /**
- * Sink / Drain Module (Destroys particles & increments score for emitter)
+ * Sink / Drain Module (Destroys particles & increments/decrements score for emitter)
  */
 class SinkModule extends ArenaModule {
     constructor(id, x, y, width = 70, height = 70, scoreTracker) {
@@ -477,11 +477,13 @@ class SinkModule extends ArenaModule {
         if (distSq <= (this.radius * 0.8) ** 2) {
             particle.dead = true;
 
-            // Increment score for emitting source
+            // Anti-particles subtract 1 point; normal particles add 1 point
+            const delta = particle.isAnti ? -1 : 1;
+
             if (particle.sourceId === 'alpha_src') {
-                this.scoreTracker.alphaScore++;
+                this.scoreTracker.alphaScore += delta;
             } else if (particle.sourceId === 'beta_src') {
-                this.scoreTracker.betaScore++;
+                this.scoreTracker.betaScore += delta;
             }
         }
     }
