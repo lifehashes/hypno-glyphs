@@ -76,7 +76,7 @@ class ArenaModule {
 }
 
 /**
- * 3. Source / Spawn Module (Uses GOL purely as a trigger generator)
+ * 3. Source / Spawn Module (Emits particles based on live outer edge cells)
  */
 class SourceSpawnModule extends ArenaModule {
     constructor(id, x, y, width, height, lifeEngine, label = 'EMITTER') {
@@ -95,23 +95,48 @@ class SourceSpawnModule extends ArenaModule {
         if (this.stepTimer >= this.stepInterval) {
             this.stepTimer = 0;
 
-            const activeCount = this.engine.getPopulationCount();
-            
-            if (activeCount > 0) {
-                const c = this.center;
-                const speed = 50 + (activeCount * 2); 
-                const color = this.engine.intrinsicColor; 
+            const n = this.engine.n;
+            const c = this.center;
+            const color = this.engine.intrinsicColor;
+            const baseSpeed = 80;
 
-                const angle = (this.engine.iteration * 0.3) % (Math.PI * 2);
-                const vx = Math.cos(angle) * speed;
-                const vy = Math.sin(angle) * speed;
+            // Iterate over the grid to locate outer edge live cells
+            for (let y = 0; y < n; y++) {
+                for (let x = 0; x < n; x++) {
+                    const isEdge = (x === 0 || x === n - 1 || y === 0 || y === n - 1);
+                    
+                    if (isEdge && this.engine.grid[y][x] === 1) {
+                        // Calculate offset coordinates mapped to module box bounds
+                        const offsetX = (x / (n - 1) - 0.5) * this.width;
+                        const offsetY = (y / (n - 1) - 0.5) * this.height;
 
-                const p = new Particle(c.x, c.y, vx, vy, 1.0, color);
-                p.sourceId = this.id; 
-                p.originHash = this.engine.originHash;
-                p.currentHash = this.engine.currentHash;
+                        const spawnX = c.x + offsetX;
+                        const spawnY = c.y + offsetY;
 
-                arena.addParticle(p);
+                        // Calculate outward direction vector away from module center
+                        let dx = spawnX - c.x;
+                        let dy = spawnY - c.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+
+                        // Fallback vector for exact center corner cases
+                        if (dist === 0) {
+                            dx = 1;
+                            dy = 0;
+                            dist = 1;
+                        }
+
+                        const vx = (dx / dist) * baseSpeed;
+                        const vy = (dy / dist) * baseSpeed;
+
+                        // Emit particle from exact edge cell position
+                        const p = new Particle(spawnX, spawnY, vx, vy, 1.0, color);
+                        p.sourceId = this.id;
+                        p.originHash = this.engine.originHash;
+                        p.currentHash = this.engine.currentHash;
+
+                        arena.addParticle(p);
+                    }
+                }
             }
 
             // Advance state
@@ -201,21 +226,19 @@ class ArenaManager {
 
     updateAndRender() {
         const now = performance.now();
-        const dt = Math.min(0.05, (now - this.lastTime) / 1000); // Frame delta cap
+        const dt = Math.min(0.05, (now - this.lastTime) / 1000);
         this.lastTime = now;
 
-        // Clear canvas background
         this.ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 1. Update Modules
+        // 1. Update Modules[cite: 23]
         this.modules.forEach(mod => mod.update(dt, this));
 
-        // 2. Physics pass on Particles
+        // 2. Physics pass on Particles[cite: 23]
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
 
-            // Apply interaction forces from all Non-GOL Physics Modules
             this.modules.forEach(mod => {
                 if (mod.affectParticle) {
                     mod.affectParticle(p, dt);
@@ -224,7 +247,6 @@ class ArenaManager {
 
             p.update(dt);
 
-            // Bounds check / cull out-of-bounds particles
             if (p.x < 0 || p.x > this.canvas.width || p.y < 0 || p.y > this.canvas.height) {
                 p.dead = true;
             }
@@ -236,7 +258,60 @@ class ArenaManager {
             }
         }
 
-        // 3. Render Module Boundaries & Nodes
+        // 3. Resolve Particle-to-Particle Collisions
+        this.handleParticleCollisions();
+
+        // 4. Render Module Boundaries & Nodes[cite: 23]
         this.modules.forEach(mod => mod.draw(this.ctx));
     }
+
+    // Add this method inside ArenaManager class in js/hypnophysics.js
+    handleParticleCollisions() {
+        const particleRadius = 2.5; // Radius from Particle.draw()
+        const minDist = particleRadius * 2;
+        const minDistSq = minDist * minDist;
+        const len = this.particles.length;
+
+        for (let i = 0; i < len; i++) {
+            const p1 = this.particles[i];
+
+            for (let j = i + 1; j < len; j++) {
+                const p2 = this.particles[j];
+
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const distSq = dx * dx + dy * dy;
+
+                // Collision detected!
+                if (distSq < minDistSq && distSq > 0) {
+                    const dist = Math.sqrt(distSq);
+
+                    // Normal vector along collision axis
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+
+                    // 1. Separate particles to prevent overlap sticking
+                    const overlap = 0.5 * (minDist - dist);
+                    p1.x -= nx * overlap;
+                    p1.y -= ny * overlap;
+                    p2.x += nx * overlap;
+                    p2.y += ny * overlap;
+
+                    // 2. Relative velocity along normal vector
+                    const kx = p1.vx - p2.vx;
+                    const ky = p1.vy - p2.vy;
+                    const p = kx * nx + ky * ny;
+
+                    // Only bounce if particles are moving toward each other
+                    if (p > 0) {
+                        p1.vx -= p * nx;
+                        p1.vy -= p * ny;
+                        p2.vx += p * nx;
+                        p2.vy += p * ny;
+                    }
+                }
+            }
+        }
+    }
+
 }

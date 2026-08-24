@@ -148,16 +148,17 @@
 </div>
 
 <script>
-    // Database payload
+    // 1. Core State & Variable Declarations (Declared FIRST)
     const databaseGlyphs = <?php echo json_encode($myGlyphs ?: []); ?>;
+    const canvas = document.getElementById('physics-canvas');
+    let isRunning = false;
 
-    // Dedicated preview LifeEngines (Side Panel Controls)
+    // 2. Engines & Arena Manager
     const alphaEngine = new LifeEngine('glyph-alpha-canvas', 16);
     const betaEngine  = new LifeEngine('glyph-beta-canvas', 16);
+    const arena       = new ArenaManager('physics-canvas');
 
-    // Arena Physics Manager
-    const arena = new ArenaManager('physics-canvas');
-
+    // 3. Module & Seed Setup Function
     function loadInitialGlyphs() {
         if (databaseGlyphs.length > 0) {
             const alphaData = databaseGlyphs[0];
@@ -182,22 +183,31 @@
         document.getElementById('beta-color').style.color  = betaEngine.intrinsicColor;
         document.getElementById('beta-color').innerText    = betaEngine.intrinsicColor.toUpperCase();
 
-        // Register Source/Spawn Modules
-        arena.addModule(new SourceSpawnModule('alpha_src', 0, 0, 70, 70, alphaEngine, 'ALPHA'));
-        arena.addModule(new SourceSpawnModule('beta_src', 0, 0, 70, 70, betaEngine, 'BETA'));
-        arena.addModule(new AttractorModule('gravity_well_1', 0, 0, 70, 70, 8000));
+        // Calculate layout geometry
+        const modWidth = 70;
+        const modHeight = 70;
+        const padding = 20;
 
-        arena.layoutGrid(4, 20, 75, 75);
+        // Fallback dimensions if canvas isn't fully laid out by browser yet
+        const stageWidth = canvas.width || 800;
+        const stageHeight = canvas.height || 600;
+
+        const centerY = (stageHeight / 2) - (modHeight / 2);
+        const alphaX  = padding;
+        const betaX   = stageWidth - modWidth - padding;
+
+        // Register Modules on Opposite Edges
+        arena.addModule(new SourceSpawnModule('alpha_src', alphaX, centerY, modWidth, modHeight, alphaEngine, 'ALPHA'));
+        arena.addModule(new SourceSpawnModule('beta_src', betaX, centerY, modWidth, modHeight, betaEngine, 'BETA'));
+        
+        // Center gravity well
+        const wellX = (stageWidth / 2) - (modWidth / 2);
+        arena.addModule(new AttractorModule('gravity_well_1', wellX, centerY, modWidth, modHeight, 8000));
     }
-
-    loadInitialGlyphs();
 
     function getRandomBinary(length) {
         return Array.from({ length }, () => (Math.random() > 0.7 ? '1' : '0')).join('');
     }
-
-    const canvas = document.getElementById('physics-canvas');
-    let isRunning = false;
 
     function resizeCanvas() {
         const rect = canvas.parentElement.getBoundingClientRect();
@@ -211,9 +221,11 @@
     const resizeObserver = new ResizeObserver(() => resizeCanvas());
     resizeObserver.observe(canvas.parentElement);
 
-    // Update stats panel inside the main render/loop function
+    // Initial positioning setup
+    resizeCanvas();
+    loadInitialGlyphs();
+
     function updateHUD() {
-        // Dynamic max generations display
         document.getElementById('alpha-gen').innerText = `${alphaEngine.iteration} / ${alphaEngine.maxGenerations}`;
         document.getElementById('beta-gen').innerText  = `${betaEngine.iteration} / ${betaEngine.maxGenerations}`;
 
@@ -228,12 +240,10 @@
         document.getElementById('beta-current-hash').innerText  = betaEngine.currentHash  || '-';
     }
 
-    // Render loop handles continuous rendering of both physics arena and preview canvases
     function loop() {
         if (isRunning) {
             arena.updateAndRender();
             
-            // Re-render side preview canvases with each step iteration
             alphaEngine.render();
             betaEngine.render();
 
