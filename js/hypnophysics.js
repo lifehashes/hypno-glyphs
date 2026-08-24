@@ -212,6 +212,7 @@ class ArenaManager {
         this.ctx = this.canvas.getContext('2d');
         this.modules = new Map();
         this.particles = [];
+        this.effects = []; // Visual effect queue
         this.lastTime = performance.now();
         this.boundaryMode = 'none'; // 'none' | 'toroidal' | 'box'
     }
@@ -345,6 +346,16 @@ class ArenaManager {
         // 3. Resolve Particle-to-Particle Collisions
         this.handleParticleCollisions();
 
+        // 3.5 Render Visual Effects (Flashes & Explosions)
+        for (let i = this.effects.length - 1; i >= 0; i--) {
+            const fx = this.effects[i];
+            fx.update(dt);
+            fx.draw(this.ctx);
+            if (fx.dead) {
+                this.effects.splice(i, 1);
+            }
+        }
+
         // 4. Render Boundary Visuals & Module Footprints
         this.drawBoundaryVisuals();
         this.modules.forEach(mod => mod.draw(this.ctx));
@@ -379,15 +390,18 @@ class ArenaManager {
                         p1.dead = true;
                         p2.dead = true;
 
+                        const epicX = (p1.x + p2.x) / 2;
+                        const epicY = (p1.y + p2.y) / 2;
+
+                        // Spawn flash effect using the particle's inherent color
+                        this.effects.push(new ExplosionFlash(epicX, epicY, 40, p1.color));
+
                         // Shockwave parameters
                         const killRadius = 25;       // Inner radius: direct disintegration
                         const blastRadius = 90;      // Outer radius: physics force blowback
                         const killRadiusSq = killRadius * killRadius;
                         const blastRadiusSq = blastRadius * blastRadius;
                         const blastImpulse = 450;    // Magnitude of velocity imparted
-
-                        const epicX = (p1.x + p2.x) / 2;
-                        const epicY = (p1.y + p2.y) / 2;
 
                         for (let k = 0; k < len; k++) {
                             const pTarget = this.particles[k];
@@ -406,7 +420,6 @@ class ArenaManager {
                                 const normX = bdx / bDist;
                                 const normY = bdy / bDist;
 
-                                // Falloff factor: particles closer to origin get launched faster
                                 const falloff = 1 - (bDist / blastRadius);
                                 const force = blastImpulse * falloff;
 
@@ -542,6 +555,59 @@ class QCDInverterModule extends ArenaModule {
         ctx.font = '9px monospace';
         ctx.fillStyle = '#ff00ff';
         ctx.fillText('QCD INVERTER', this.x + 2, this.y + 12);
+        ctx.restore();
+    }
+}
+
+/**
+ * ExplosionFlash Effect
+ * Manages expanding ring shockwaves and glowing flash centers.
+ */
+class ExplosionFlash {
+    constructor(x, y, maxRadius = 35, color = '#ffffff') {
+        this.x = x;
+        this.y = y;
+        this.radius = 2;
+        this.maxRadius = maxRadius;
+        this.color = color;
+        this.life = 1.0;
+        this.dead = false;
+    }
+
+    update(dt) {
+        // Expand rapidly and fade out
+        this.radius += (this.maxRadius - this.radius) * 12 * dt;
+        this.life -= 3.5 * dt;
+
+        if (this.life <= 0) {
+            this.dead = true;
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+
+        // Radial core flash
+        const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.3, this.color);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Expanding outer ring shockwave
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 0.85, 0, Math.PI * 2);
+        ctx.stroke();
+
         ctx.restore();
     }
 }
