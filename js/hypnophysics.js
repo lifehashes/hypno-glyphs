@@ -205,6 +205,7 @@ class ArenaManager {
         this.modules = new Map();
         this.particles = [];
         this.lastTime = performance.now();
+        this.boundaryMode = 'none'; // 'none' | 'toroidal' | 'box'
     }
 
     addModule(module) { this.modules.set(module.id, module); }
@@ -224,6 +225,84 @@ class ArenaManager {
         });
     }
 
+    handleParticleBoundaries(p) {
+        const r = 2.5;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        if (this.boundaryMode === 'none') {
+            if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+                p.dead = true;
+            }
+        } else if (this.boundaryMode === 'toroidal') {
+            if (p.x < 0) p.x += w;
+            if (p.x > w) p.x -= w;
+            if (p.y < 0) p.y += h;
+            if (p.y > h) p.y -= h;
+        } else if (this.boundaryMode === 'box') {
+            if (p.x - r < 0) {
+                p.x = r;
+                p.vx *= -1;
+            } else if (p.x + r > w) {
+                p.x = w - r;
+                p.vx *= -1;
+            }
+
+            if (p.y - r < 0) {
+                p.y = r;
+                p.vy *= -1;
+            } else if (p.y + r > h) {
+                p.y = h - r;
+                p.vy *= -1;
+            }
+        }
+    }
+
+    drawBoundaryVisuals() {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const ctx = this.ctx;
+
+        if (this.boundaryMode === 'toroidal') {
+            ctx.save();
+            ctx.strokeStyle = '#42f485';
+            ctx.shadowColor = '#42f485';
+            ctx.shadowBlur = 8;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(1, 1, w - 2, h - 2);
+            ctx.restore();
+        } else if (this.boundaryMode === 'box') {
+            ctx.save();
+            const bw = 8; // Border thickness
+
+            // Create offscreen striped pattern canvas
+            const patCanvas = document.createElement('canvas');
+            patCanvas.width = 16;
+            patCanvas.height = 16;
+            const pctx = patCanvas.getContext('2d');
+
+            pctx.fillStyle = '#111111';
+            pctx.fillRect(0, 0, 16, 16);
+            pctx.fillStyle = '#e5c100';
+
+            pctx.beginPath();
+            pctx.moveTo(0, 8);  pctx.lineTo(8, 0);   pctx.lineTo(16, 0); pctx.lineTo(0, 16); pctx.fill();
+            pctx.beginPath();
+            pctx.moveTo(16, 8); pctx.lineTo(8, 16);  pctx.lineTo(16, 16); pctx.fill();
+
+            const pattern = ctx.createPattern(patCanvas, 'repeat');
+            ctx.fillStyle = pattern;
+
+            // Render hazard frames around canvas edges
+            ctx.fillRect(0, 0, w, bw);             // Top
+            ctx.fillRect(0, h - bw, w, bw);         // Bottom
+            ctx.fillRect(0, 0, bw, h);             // Left
+            ctx.fillRect(w - bw, 0, bw, h);         // Right
+
+            ctx.restore();
+        }
+    }
+
     updateAndRender() {
         const now = performance.now();
         const dt = Math.min(0.05, (now - this.lastTime) / 1000);
@@ -232,10 +311,10 @@ class ArenaManager {
         this.ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 1. Update Modules[cite: 23]
+        // 1. Update Modules
         this.modules.forEach(mod => mod.update(dt, this));
 
-        // 2. Physics pass on Particles[cite: 23]
+        // 2. Physics pass on Particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
 
@@ -246,10 +325,7 @@ class ArenaManager {
             });
 
             p.update(dt);
-
-            if (p.x < 0 || p.x > this.canvas.width || p.y < 0 || p.y > this.canvas.height) {
-                p.dead = true;
-            }
+            this.handleParticleBoundaries(p);
 
             if (p.dead) {
                 this.particles.splice(i, 1);
@@ -261,13 +337,13 @@ class ArenaManager {
         // 3. Resolve Particle-to-Particle Collisions
         this.handleParticleCollisions();
 
-        // 4. Render Module Boundaries & Nodes[cite: 23]
+        // 4. Render Boundary Visuals & Module Footprints
+        this.drawBoundaryVisuals();
         this.modules.forEach(mod => mod.draw(this.ctx));
     }
 
-    // Add this method inside ArenaManager class in js/hypnophysics.js
     handleParticleCollisions() {
-        const particleRadius = 2.5; // Radius from Particle.draw()
+        const particleRadius = 2.5;
         const minDist = particleRadius * 2;
         const minDistSq = minDist * minDist;
         const len = this.particles.length;
@@ -282,27 +358,22 @@ class ArenaManager {
                 const dy = p2.y - p1.y;
                 const distSq = dx * dx + dy * dy;
 
-                // Collision detected!
                 if (distSq < minDistSq && distSq > 0) {
                     const dist = Math.sqrt(distSq);
 
-                    // Normal vector along collision axis
                     const nx = dx / dist;
                     const ny = dy / dist;
 
-                    // 1. Separate particles to prevent overlap sticking
                     const overlap = 0.5 * (minDist - dist);
                     p1.x -= nx * overlap;
                     p1.y -= ny * overlap;
                     p2.x += nx * overlap;
                     p2.y += ny * overlap;
 
-                    // 2. Relative velocity along normal vector
                     const kx = p1.vx - p2.vx;
                     const ky = p1.vy - p2.vy;
                     const p = kx * nx + ky * ny;
 
-                    // Only bounce if particles are moving toward each other
                     if (p > 0) {
                         p1.vx -= p * nx;
                         p1.vy -= p * ny;
@@ -313,5 +384,4 @@ class ArenaManager {
             }
         }
     }
-
 }

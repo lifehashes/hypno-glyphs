@@ -151,6 +151,9 @@
             <span id="gravity-val">8000</span>
         </div>
 
+        <!-- Boundary Mode Selector Button -->
+        <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>
+
         <button class="help-btn" onclick="clearArena()">CLEAR ARENA</button>
     </div>
 </div>
@@ -287,6 +290,21 @@
         if (well) {
             well.strength = val;
         }
+    }
+
+    function cycleBoundaryMode() {
+        const modes = ['none', 'toroidal', 'box'];
+        const labels = {
+            'none': 'BOUNDARIES: NONE',
+            'toroidal': 'BOUNDARIES: TOROIDAL',
+            'box': 'BOUNDARIES: SOLID BOX'
+        };
+
+        const currentIndex = modes.indexOf(arena.boundaryMode);
+        const nextMode = modes[(currentIndex + 1) % modes.length];
+
+        arena.boundaryMode = nextMode;
+        document.getElementById('boundary-btn').innerText = labels[nextMode];
     }
 
 </script>
