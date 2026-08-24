@@ -161,8 +161,8 @@
         <!-- Gravity Slider -->
         <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
             <label for="gravity-slider">GRAVITY WELL:</label>
-            <input type="range" id="gravity-slider" min="-20000" max="40000" step="1000" value="8000" oninput="updateGravity(this.value)">
-            <span id="gravity-val">8000</span>
+            <input type="range" id="gravity-slider" min="-20000000" max="20000000" step="1000000" value="10000" oninput="updateGravity(this.value)">
+            <span id="gravity-val">10000</span>
         </div>
 
         <!-- Boundary Mode Selector Button -->
