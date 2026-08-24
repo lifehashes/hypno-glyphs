@@ -247,6 +247,10 @@
         const horizontalOffset = 160;
         arena.addModule(new QCDInverterModule('qcd_left', centerX - horizontalOffset, centerY, modWidth, modHeight));
         arena.addModule(new QCDInverterModule('qcd_right', centerX + horizontalOffset, centerY, modWidth, modHeight));
+
+        // 5. Add Doublers above and below QCD Inverters
+        arena.addModule(new DoublerModule('doubler_top', centerX - horizontalOffset, centerY - verticalOffset, modWidth, modHeight));
+        arena.addModule(new DoublerModule('doubler_bottom', centerX + horizontalOffset, centerY + verticalOffset, modWidth, modHeight));        
     }
 
     function getRandomBinary(length) {

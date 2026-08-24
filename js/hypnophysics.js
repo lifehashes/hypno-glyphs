@@ -329,7 +329,7 @@ class ArenaManager {
 
             this.modules.forEach(mod => {
                 if (mod.affectParticle) {
-                    mod.affectParticle(p, dt);
+                    mod.affectParticle(p, dt, this); // Pass 'this' as arena reference
                 }
             });
 
@@ -515,13 +515,16 @@ class SinkModule extends ArenaModule {
 
 /**
  * QCD Inverter Module
- * Converts passing particles into anti-particles of their own type/source.
+ * Flips the quantum polarity of entering particles:
+ * Matter -> Anti-Matter, and Anti-Matter -> Matter.
  */
 class QCDInverterModule extends ArenaModule {
     constructor(id, x, y, width = 70, height = 70) {
         super(id, x, y, width, height, 'QCD_INVERTER');
         this.radius = Math.min(width, height) / 2;
         this.pulseAngle = 0;
+        // Tracks particles currently residing inside the inversion zone
+        this.activeParticles = new Set();
     }
 
     update(dt) {
@@ -533,10 +536,17 @@ class QCDInverterModule extends ArenaModule {
         const dx = particle.x - c.x;
         const dy = particle.y - c.y;
         const distSq = dx * dx + dy * dy;
+        const inZone = distSq <= (this.radius * 0.7) ** 2;
 
-        // Invert quantum charge state when passing through inversion field
-        if (distSq <= (this.radius * 0.7) ** 2) {
-            particle.isAnti = true;
+        if (inZone) {
+            // Toggle state only on the initial frame the particle enters the zone
+            if (!this.activeParticles.has(particle)) {
+                particle.isAnti = !particle.isAnti;
+                this.activeParticles.add(particle);
+            }
+        } else {
+            // Remove particle from set once it exits the zone so it can be inverted again later
+            this.activeParticles.delete(particle);
         }
     }
 
@@ -610,6 +620,89 @@ class ExplosionFlash {
         ctx.arc(this.x, this.y, this.radius * 0.85, 0, Math.PI * 2);
         ctx.stroke();
 
+        ctx.restore();
+    }
+}
+
+/**
+ * Doubler Module
+ * Spawns a clone particle upon entry and applies a slight trajectory divergence.
+ */
+class DoublerModule extends ArenaModule {
+    constructor(id, x, y, width = 70, height = 70) {
+        super(id, x, y, width, height, 'DOUBLER');
+        this.radius = Math.min(width, height) / 2;
+        // Tracks particles that have already passed through to prevent infinite duplication loop
+        this.processedParticles = new WeakSet();
+    }
+
+    affectParticle(particle, dt, arena) {
+        // Skip if particle has already been cloned by this module
+        if (this.processedParticles.has(particle)) return;
+
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq <= (this.radius * 0.7) ** 2) {
+            // Mark original particle as processed
+            this.processedParticles.add(particle);
+
+            // Calculate slightly deflected velocity for the clone (+/- 15 degrees)
+            const angle = (Math.random() - 0.5) * (Math.PI / 6);
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+
+            const cloneVx = particle.vx * cos - particle.vy * sin;
+            const cloneVy = particle.vx * sin + particle.vy * cos;
+
+            // Instantiate duplicate particle
+            const clone = new Particle(
+                particle.x,
+                particle.y,
+                cloneVx,
+                cloneVy,
+                particle.charge,
+                particle.color
+            );
+
+            // Retain source metadata and anti-matter state
+            clone.sourceId = particle.sourceId;
+            clone.originHash = particle.originHash;
+            clone.currentHash = particle.currentHash;
+            clone.isAnti = particle.isAnti;
+
+            // Mark clone as processed so it doesn't trigger immediate duplicate loop inside same module
+            this.processedParticles.add(clone);
+
+            // Add clone to active particle pool
+            arena.addParticle(clone);
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        ctx.save();
+
+        // Dual concentric ring visual
+        ctx.strokeStyle = '#ffbb00';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#ffbb00';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.4, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.font = '9px monospace';
+        ctx.fillStyle = '#ffbb00';
+        ctx.fillText('DOUBLER', this.x + 16, this.y + 12);
         ctx.restore();
     }
 }
