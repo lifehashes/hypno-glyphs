@@ -49,8 +49,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HYPNOGLYPHS // GENERATIVE PHYSICS ENGINE</title>
-    <SCRIPT SRC="js/sha256.js"></SCRIPT>
-	<SCRIPT SRC="js/gol.js"></SCRIPT>
+    <SCRIPT SRC="js/gol.js"></SCRIPT>
+    <SCRIPT SRC="js/hypnophysics.js"></SCRIPT>
+    <SCRIPT SRC="js/sha256.js"></SCRIPT>	
     <link rel="stylesheet" href="styles.css">
     <style></style>
 </head>
@@ -88,6 +89,15 @@
                 <span>PARTICLES ACTIVE:</span>
                 <span class="stat-value" id="alpha-particles">0</span>
             </div>
+            <!-- NEW HASH READOUTS -->
+            <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
+                <span style="font-size:10px; opacity:0.6;">ORIGIN HASH:</span>
+                <span class="stat-value" id="alpha-origin-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
+            </div>
+            <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
+                <span style="font-size:10px; opacity:0.6;">CURRENT HASH:</span>
+                <span class="stat-value" id="alpha-current-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
+            </div>
             <button class="load-btn" onclick="randomizeSource('alpha')">RANDOMIZE SEED</button>
         </div>
 
@@ -104,11 +114,11 @@
             </div>
             <div class="stat-line">
                 <span>DESIGNATION:</span>
-                <span class="stat-value" id="beta-name">CALABI-YAU</span>
+                <span class="stat-value" id="beta-name">P_56_10</span>
             </div>
             <div class="stat-line">
                 <span>INTRINSIC HUE:</span>
-                <span class="stat-value" id="beta-color" style="color: #00ffff">#00FFFF</span>
+                <span class="stat-value" id="beta-color" style="color: #42f485">#42F485</span>
             </div>
             <div class="stat-line">
                 <span>GENERATION:</span>
@@ -117,6 +127,15 @@
             <div class="stat-line">
                 <span>PARTICLES ACTIVE:</span>
                 <span class="stat-value" id="beta-particles">0</span>
+            </div>
+            <!-- NEW HASH READOUTS -->
+            <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
+                <span style="font-size:10px; opacity:0.6;">ORIGIN HASH:</span>
+                <span class="stat-value" id="beta-origin-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
+            </div>
+            <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
+                <span style="font-size:10px; opacity:0.6;">CURRENT HASH:</span>
+                <span class="stat-value" id="beta-current-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
             </div>
             <button class="load-btn" onclick="randomizeSource('beta')">RANDOMIZE SEED</button>
         </div>
@@ -129,15 +148,16 @@
 </div>
 
 <script>
-
-    // Pass PHP MySQL database glyph records into JavaScript
+    // Database payload
     const databaseGlyphs = <?php echo json_encode($myGlyphs ?: []); ?>;
 
-    // Initialize Alpha and Beta engines
+    // Dedicated preview LifeEngines (Side Panel Controls)
     const alphaEngine = new LifeEngine('glyph-alpha-canvas', 16);
     const betaEngine  = new LifeEngine('glyph-beta-canvas', 16);
 
-    // Load initial seeds (database records or randomized fallback)
+    // Arena Physics Manager
+    const arena = new ArenaManager('physics-canvas');
+
     function loadInitialGlyphs() {
         if (databaseGlyphs.length > 0) {
             const alphaData = databaseGlyphs[0];
@@ -155,12 +175,22 @@
             betaEngine.loadFromBinary(getRandomBinary(256));
         }
 
-        // Sync DOM metadata display with engine colors
+        // Color metadata
         document.getElementById('alpha-color').style.color = alphaEngine.intrinsicColor;
         document.getElementById('alpha-color').innerText   = alphaEngine.intrinsicColor.toUpperCase();
 
         document.getElementById('beta-color').style.color  = betaEngine.intrinsicColor;
         document.getElementById('beta-color').innerText    = betaEngine.intrinsicColor.toUpperCase();
+
+        // Register Source/Spawn Modules into the Arena
+        arena.addModule(new SourceSpawnModule('alpha_src', 0, 0, 70, 70, alphaEngine, 'ALPHA'));
+        arena.addModule(new SourceSpawnModule('beta_src', 0, 0, 70, 70, betaEngine, 'BETA'));
+
+        // Add a non-GOL Physics Attractor module to demonstrate physics interactions
+        arena.addModule(new AttractorModule('gravity_well_1', 0, 0, 70, 70, 8000));
+
+        // Arrange modules automatically
+        arena.layoutGrid(4, 20, 75, 75);
     }
 
     loadInitialGlyphs();
@@ -170,16 +200,13 @@
     }
 
     const canvas = document.getElementById('physics-canvas');
-    const ctx = canvas.getContext('2d');
     let isRunning = false;
 
-    // Observe layout changes and adjust source preview resolution
     function resizeCanvas() {
         const rect = canvas.parentElement.getBoundingClientRect();
         canvas.width = rect.width;
         canvas.height = rect.height;
 
-        // Keep preview canvas sizing sharp and fitted
         alphaEngine.resize();
         betaEngine.resize();
     }
@@ -187,28 +214,35 @@
     const resizeObserver = new ResizeObserver(() => resizeCanvas());
     resizeObserver.observe(canvas.parentElement);
 
+    // Update stats panel inside the main render/loop function
+    function updateHUD() {
+        // 1. Update Generation Readouts
+        document.getElementById('alpha-gen').innerText = `${alphaEngine.iteration} / 500`;
+        document.getElementById('beta-gen').innerText  = `${betaEngine.iteration} / 500`;
+
+        // 2. Update Active Particle Counters
+        const alphaCount = arena.particles.filter(p => p.sourceId === 'alpha_src').length;
+        const betaCount  = arena.particles.filter(p => p.sourceId === 'beta_src').length;
+        document.getElementById('alpha-particles').innerText = alphaCount;
+        document.getElementById('beta-particles').innerText  = betaCount;
+
+        // 3. Update Hash Display
+        document.getElementById('alpha-origin-hash').innerText  = alphaEngine.originHash  || '-';
+        document.getElementById('alpha-current-hash').innerText = alphaEngine.currentHash || '-';
+        document.getElementById('beta-origin-hash').innerText   = betaEngine.originHash   || '-';
+        document.getElementById('beta-current-hash').innerText  = betaEngine.currentHash  || '-';
+    }
+
+    // Render loop handles continuous rendering of both physics arena and preview canvases
     function loop() {
         if (isRunning) {
-            ctx.fillStyle = 'rgba(5, 5, 5, 0.25)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Tech grid rendering
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-            ctx.lineWidth = 1;
-            const gridSize = 40;
+            arena.updateAndRender();
             
-            for (let x = 0; x < canvas.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y < canvas.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
+            // Re-render side preview canvases with each step iteration
+            alphaEngine.render();
+            betaEngine.render();
+
+            updateHUD();
         }
         requestAnimationFrame(loop);
     }
@@ -222,6 +256,8 @@
     }
 
     function clearArena() {
+        arena.particles = [];
+        const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
