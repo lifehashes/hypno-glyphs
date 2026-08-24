@@ -379,19 +379,42 @@ class ArenaManager {
                         p1.dead = true;
                         p2.dead = true;
 
-                        // Trigger area-of-effect blast that destroys surrounding particles
-                        const blastRadiusSq = 35 * 35;
+                        // Shockwave parameters
+                        const killRadius = 25;       // Inner radius: direct disintegration
+                        const blastRadius = 90;      // Outer radius: physics force blowback
+                        const killRadiusSq = killRadius * killRadius;
+                        const blastRadiusSq = blastRadius * blastRadius;
+                        const blastImpulse = 450;    // Magnitude of velocity imparted
+
+                        const epicX = (p1.x + p2.x) / 2;
+                        const epicY = (p1.y + p2.y) / 2;
+
                         for (let k = 0; k < len; k++) {
                             const pTarget = this.particles[k];
-                            if (!pTarget.dead) {
-                                const bdx = pTarget.x - p1.x;
-                                const bdy = pTarget.y - p1.y;
-                                if (bdx * bdx + bdy * bdy <= blastRadiusSq) {
-                                    pTarget.dead = true;
-                                }
+                            if (pTarget.dead) continue;
+
+                            const bdx = pTarget.x - epicX;
+                            const bdy = pTarget.y - epicY;
+                            const bDistSq = bdx * bdx + bdy * bdy;
+
+                            if (bDistSq <= killRadiusSq) {
+                                // Vaporize particles in the core
+                                pTarget.dead = true;
+                            } else if (bDistSq <= blastRadiusSq && bDistSq > 0) {
+                                // Impart radial blast force to surviving surrounding particles
+                                const bDist = Math.sqrt(bDistSq);
+                                const normX = bdx / bDist;
+                                const normY = bdy / bDist;
+
+                                // Falloff factor: particles closer to origin get launched faster
+                                const falloff = 1 - (bDist / blastRadius);
+                                const force = blastImpulse * falloff;
+
+                                pTarget.vx += normX * force;
+                                pTarget.vy += normY * force;
                             }
                         }
-                        break; // Stop further checks for annihilated p1
+                        break; // Stop checking p1 as it has been annihilated
                     }
 
                     // Standard elastic physical bounce for normal interactions
