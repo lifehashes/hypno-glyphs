@@ -242,6 +242,11 @@
 
         arena.addModule(new AttractorModule('gravity_top', centerX, centerY - verticalOffset, modWidth, modHeight, currentGravity));
         arena.addModule(new AttractorModule('gravity_bottom', centerX, centerY + verticalOffset, modWidth, modHeight, currentGravity));
+
+        // 4. QCD Inverter modules
+        const horizontalOffset = 160;
+        arena.addModule(new QCDInverterModule('qcd_left', centerX - horizontalOffset, centerY, modWidth, modHeight));
+        arena.addModule(new QCDInverterModule('qcd_right', centerX + horizontalOffset, centerY, modWidth, modHeight));
     }
 
     function getRandomBinary(length) {

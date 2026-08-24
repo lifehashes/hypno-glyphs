@@ -10,20 +10,19 @@ class Particle {
         this.vy = vy;
         this.ax = 0;
         this.ay = 0;
-        this.charge = charge; // e.g., positive, negative, neutral
+        this.charge = charge;
         this.color = color;
-        this.life = 1.0;     // Opacity / lifespan factor
+        this.life = 1.0;
         this.dead = false;
+        this.isAnti = false; // QCD Inversion state flag
     }
 
     update(dt) {
-        // Integrate forces
         this.vx += this.ax * dt;
         this.vy += this.ay * dt;
         this.x += this.vx * dt;
         this.y += this.vy * dt;
 
-        // Reset accelerations for next frame
         this.ax = 0;
         this.ay = 0;
     }
@@ -31,12 +30,21 @@ class Particle {
     draw(ctx) {
         ctx.save();
         ctx.globalAlpha = this.life;
+        ctx.strokeStyle = this.color;
         ctx.fillStyle = this.color;
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = 6;
         ctx.shadowColor = this.color;
+
         ctx.beginPath();
         ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
-        ctx.fill();
+
+        if (this.isAnti) {
+            ctx.lineWidth = 1.2;
+            ctx.stroke(); // Render hollow ring for anti-particle
+        } else {
+            ctx.fill();   // Render solid sphere for normal particle
+        }
+
         ctx.restore();
     }
 }
@@ -350,17 +358,44 @@ class ArenaManager {
 
         for (let i = 0; i < len; i++) {
             const p1 = this.particles[i];
+            if (p1.dead) continue;
 
             for (let j = i + 1; j < len; j++) {
                 const p2 = this.particles[j];
+                if (p2.dead) continue;
+
+                // RULE 1: Anti-particles do NOT interact with opposite source types (A doesn't see B)
+                if ((p1.isAnti || p2.isAnti) && p1.sourceId !== p2.sourceId) {
+                    continue; 
+                }
 
                 const dx = p2.x - p1.x;
                 const dy = p2.y - p1.y;
                 const distSq = dx * dx + dy * dy;
 
                 if (distSq < minDistSq && distSq > 0) {
-                    const dist = Math.sqrt(distSq);
+                    // RULE 2: Matter / Anti-Matter Annihilation within same source family
+                    if (p1.sourceId === p2.sourceId && p1.isAnti !== p2.isAnti) {
+                        p1.dead = true;
+                        p2.dead = true;
 
+                        // Trigger area-of-effect blast that destroys surrounding particles
+                        const blastRadiusSq = 35 * 35;
+                        for (let k = 0; k < len; k++) {
+                            const pTarget = this.particles[k];
+                            if (!pTarget.dead) {
+                                const bdx = pTarget.x - p1.x;
+                                const bdy = pTarget.y - p1.y;
+                                if (bdx * bdx + bdy * bdy <= blastRadiusSq) {
+                                    pTarget.dead = true;
+                                }
+                            }
+                        }
+                        break; // Stop further checks for annihilated p1
+                    }
+
+                    // Standard elastic physical bounce for normal interactions
+                    const dist = Math.sqrt(distSq);
                     const nx = dx / dist;
                     const ny = dy / dist;
 
@@ -436,6 +471,54 @@ class SinkModule extends ArenaModule {
         ctx.font = '9px monospace';
         ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
         ctx.fillText('DRAIN SINK', this.x + 8, this.y + 12);
+        ctx.restore();
+    }
+}
+
+/**
+ * QCD Inverter Module
+ * Converts passing particles into anti-particles of their own type/source.
+ */
+class QCDInverterModule extends ArenaModule {
+    constructor(id, x, y, width = 70, height = 70) {
+        super(id, x, y, width, height, 'QCD_INVERTER');
+        this.radius = Math.min(width, height) / 2;
+        this.pulseAngle = 0;
+    }
+
+    update(dt) {
+        this.pulseAngle += dt * 3;
+    }
+
+    affectParticle(particle, dt) {
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+
+        // Invert quantum charge state when passing through inversion field
+        if (distSq <= (this.radius * 0.7) ** 2) {
+            particle.isAnti = true;
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        ctx.save();
+
+        // Inversion field visuals
+        ctx.strokeStyle = '#ff00ff';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#ff00ff';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.75, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.font = '9px monospace';
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillText('QCD INVERTER', this.x + 2, this.y + 12);
         ctx.restore();
     }
 }
