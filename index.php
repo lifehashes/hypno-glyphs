@@ -265,9 +265,12 @@
 
         // Place Positive and Negative Capacitors into the Arena grid
         const currentCapacitorStrength = parseFloat(document.getElementById('capacitor-slider').value) || 18000;
-
         arena.addModule(new CapacitorModule('cap_pos', centerX - horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 4, currentCapacitorStrength));
         arena.addModule(new CapacitorModule('cap_neg', centerX + horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, -4, currentCapacitorStrength));
+
+        // 6. Add Kinetic Converter Modules
+        arena.addModule(new KineticConverterModule('kinetic_fast', centerX - horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, 'double'));
+        arena.addModule(new KineticConverterModule('kinetic_slow', centerX + horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 'half'));
 
     }
 

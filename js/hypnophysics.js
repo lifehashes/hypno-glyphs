@@ -929,3 +929,70 @@ class CapacitorModule extends ArenaModule {
         ctx.restore();
     }
 }
+
+/**
+ * Kinetic Converter Module
+ * Halves or doubles the velocity of particles passing through its zone.
+ * mode: 'double' | 'half' (or multiplier value like 2.0 / 0.5)
+ */
+class KineticConverterModule extends ArenaModule {
+    constructor(id, x, y, width = 70, height = 70, mode = 'double') {
+        super(id, x, y, width, height, 'KINETIC_CONVERTER');
+        this.mode = mode; // 'double' or 'half'
+        this.multiplier = mode === 'half' ? 0.5 : 2.0;
+        this.radius = Math.min(width, height) / 2;
+        this.activeParticles = new Set();
+    }
+
+    affectParticle(particle, dt) {
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+        const inZone = distSq <= (this.radius * 0.7) ** 2;
+
+        if (inZone) {
+            // Scale velocity once when entering the zone boundary
+            if (!this.activeParticles.has(particle)) {
+                particle.vx *= this.multiplier;
+                particle.vy *= this.multiplier;
+                this.activeParticles.add(particle);
+            }
+        } else {
+            // Reset state once particle leaves field
+            this.activeParticles.delete(particle);
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        const isDouble = this.multiplier > 1.0;
+        const color = isDouble ? '#ff9900' : '#00bfff';
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = color;
+        ctx.lineWidth = 1.5;
+
+        // Circular accelerator zone outline
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Directional Chevron Arrows (Up for Fast, Down for Slow)
+        const offset = isDouble ? -3 : 3;
+        ctx.beginPath();
+        ctx.moveTo(c.x - 6, c.y + offset);
+        ctx.lineTo(c.x, c.y - offset);
+        ctx.lineTo(c.x + 6, c.y + offset);
+        ctx.stroke();
+
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(isDouble ? 'BOOST 2X' : 'SLOW 0.5X', c.x, this.y + 12);
+        ctx.restore();
+    }
+}
