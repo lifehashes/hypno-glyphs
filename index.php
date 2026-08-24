@@ -89,6 +89,10 @@
                 <span>PARTICLES ACTIVE:</span>
                 <span class="stat-value" id="alpha-particles">0</span>
             </div>
+            <div class="stat-line">
+                <span>SCORE:</span>
+                <span class="stat-value" id="alpha-score" style="color:#00ffff; font-weight:bold;">0</span>
+            </div>
             <!-- NEW HASH READOUTS -->
             <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
                 <span style="font-size:10px; opacity:0.6;">ORIGIN HASH:</span>
@@ -98,7 +102,10 @@
                 <span style="font-size:10px; opacity:0.6;">CURRENT HASH:</span>
                 <span class="stat-value" id="alpha-current-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
             </div>
-            <button class="load-btn" onclick="randomizeSource('alpha')">RANDOMIZE SEED</button>
+            <div style="display:flex; gap:6px; margin-top:10px;">
+                <button class="load-btn" style="flex:1;" onclick="loadRandomSeed('alpha')">RANDOM SEED</button>
+                <button class="load-btn" style="flex:1; background:rgba(0, 255, 255, 0.15); border-color:#00ffff;" onclick="loadDatabaseGlyph('alpha')">DB DRAW</button>
+            </div>
         </div>
 
         <!-- MAIN ARENA CANVAS -->
@@ -128,6 +135,10 @@
                 <span>PARTICLES ACTIVE:</span>
                 <span class="stat-value" id="beta-particles">0</span>
             </div>
+            <div class="stat-line">
+                <span>SCORE:</span>
+                <span class="stat-value" id="beta-score" style="color:#00ffff; font-weight:bold;">0</span>
+            </div>
             <!-- NEW HASH READOUTS -->
             <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
                 <span style="font-size:10px; opacity:0.6;">ORIGIN HASH:</span>
@@ -137,7 +148,10 @@
                 <span style="font-size:10px; opacity:0.6;">CURRENT HASH:</span>
                 <span class="stat-value" id="beta-current-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
             </div>
-            <button class="load-btn" onclick="randomizeSource('beta')">RANDOMIZE SEED</button>
+            <div style="display:flex; gap:6px; margin-top:10px;">
+                <button class="load-btn" style="flex:1;" onclick="loadRandomSeed('beta')">RANDOM SEED</button>
+                <button class="load-btn" style="flex:1; background:rgba(0, 255, 255, 0.15); border-color:#00ffff;" onclick="loadDatabaseGlyph('beta')">DB DRAW</button>
+            </div>
         </div>
     </div>
 
@@ -168,6 +182,14 @@
     const alphaEngine = new LifeEngine('glyph-alpha-canvas', 16);
     const betaEngine  = new LifeEngine('glyph-beta-canvas', 16);
     const arena       = new ArenaManager('physics-canvas');
+    const scores = { alphaScore: 0, betaScore: 0 };
+
+    // Helper to select a random glyph from the database array
+    function getRandomDatabaseGlyph() {
+        if (!databaseGlyphs || databaseGlyphs.length === 0) return null;
+        const randomIndex = Math.floor(Math.random() * databaseGlyphs.length);
+        return databaseGlyphs[randomIndex];
+    }
 
     // 3. Module & Seed Setup Function
     function loadInitialGlyphs() {
@@ -187,33 +209,39 @@
             betaEngine.loadFromBinary(getRandomBinary(256), 500);
         }
 
-        // Color metadata
         document.getElementById('alpha-color').style.color = alphaEngine.intrinsicColor;
         document.getElementById('alpha-color').innerText   = alphaEngine.intrinsicColor.toUpperCase();
 
         document.getElementById('beta-color').style.color  = betaEngine.intrinsicColor;
         document.getElementById('beta-color').innerText    = betaEngine.intrinsicColor.toUpperCase();
 
-        // Calculate layout geometry
+        // Canvas Layout Dimensions
         const modWidth = 70;
         const modHeight = 70;
         const padding = 20;
 
-        // Fallback dimensions if canvas isn't fully laid out by browser yet
         const stageWidth = canvas.width || 800;
         const stageHeight = canvas.height || 600;
 
         const centerY = (stageHeight / 2) - (modHeight / 2);
-        const alphaX  = padding;
-        const betaX   = stageWidth - modWidth - padding;
+        const centerX = (stageWidth / 2) - (modWidth / 2);
 
-        // Register Modules on Opposite Edges
+        const alphaX = padding;
+        const betaX  = stageWidth - modWidth - padding;
+
+        // 1. Register Source Modules
         arena.addModule(new SourceSpawnModule('alpha_src', alphaX, centerY, modWidth, modHeight, alphaEngine, 'ALPHA'));
         arena.addModule(new SourceSpawnModule('beta_src', betaX, centerY, modWidth, modHeight, betaEngine, 'BETA'));
         
-        // Center gravity well
-        const wellX = (stageWidth / 2) - (modWidth / 2);
-        arena.addModule(new AttractorModule('gravity_well_1', wellX, centerY, modWidth, modHeight, 8000));
+        // 2. Center Score Sink Module
+        arena.addModule(new SinkModule('center_sink', centerX, centerY, modWidth, modHeight, scores));
+
+        // 3. Two Gravity Modules on Vertical Axis (Above and Below Center Sink)
+        const verticalOffset = 150;
+        const currentGravity = parseFloat(document.getElementById('gravity-slider').value) || 8000;
+
+        arena.addModule(new AttractorModule('gravity_top', centerX, centerY - verticalOffset, modWidth, modHeight, currentGravity));
+        arena.addModule(new AttractorModule('gravity_bottom', centerX, centerY + verticalOffset, modWidth, modHeight, currentGravity));
     }
 
     function getRandomBinary(length) {
@@ -237,19 +265,29 @@
     loadInitialGlyphs();
 
     function updateHUD() {
-        document.getElementById('alpha-gen').innerText = `${alphaEngine.iteration} / ${alphaEngine.maxGenerations}`;
-        document.getElementById('beta-gen').innerText  = `${betaEngine.iteration} / ${betaEngine.maxGenerations}`;
+        const alphaMaxStr = alphaEngine.maxGenerations === Infinity ? '?' : alphaEngine.maxGenerations;
+        const betaMaxStr  = betaEngine.maxGenerations  === Infinity ? '?' : betaEngine.maxGenerations;
+
+        document.getElementById('alpha-gen').innerText = `${alphaEngine.iteration} / ${alphaMaxStr}`;
+        document.getElementById('beta-gen').innerText  = `${betaEngine.iteration} / ${betaMaxStr}`;
 
         const alphaCount = arena.particles.filter(p => p.sourceId === 'alpha_src').length;
         const betaCount  = arena.particles.filter(p => p.sourceId === 'beta_src').length;
         document.getElementById('alpha-particles').innerText = alphaCount;
         document.getElementById('beta-particles').innerText  = betaCount;
 
+        // Score Readouts
+        document.getElementById('alpha-score').innerText = scores.alphaScore;
+        document.getElementById('beta-score').innerText  = scores.betaScore;
+
         document.getElementById('alpha-origin-hash').innerText  = alphaEngine.originHash  || '-';
         document.getElementById('alpha-current-hash').innerText = alphaEngine.currentHash || '-';
         document.getElementById('beta-origin-hash').innerText   = betaEngine.originHash   || '-';
         document.getElementById('beta-current-hash').innerText  = betaEngine.currentHash  || '-';
     }
+
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
 
     function loop() {
         if (isRunning) {
@@ -259,6 +297,16 @@
             betaEngine.render();
 
             updateHUD();
+
+            // Real-time FPS Calculation
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsUpdate >= 500) { // Update readout twice a second
+                const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+                document.getElementById('fps-counter').innerText = fps;
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
         }
         requestAnimationFrame(loop);
     }
@@ -273,23 +321,59 @@
 
     function clearArena() {
         arena.particles = [];
+        scores.alphaScore = 0;
+        scores.betaScore = 0;
+        updateHUD();
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    function randomizeSource(source) {
-        console.log(`Randomizing ${source} seed...`);
+    // 1. Spawns pure, high-entropy random binary noise (Infinite maxGen until halt)
+    function loadRandomSeed(source) {
+        const targetEngine = source === 'alpha' ? alphaEngine : betaEngine;
+        const prefix = source === 'alpha' ? 'alpha' : 'beta';
+
+        const randomBin = getRandomBinary(256);
+        targetEngine.loadFromBinary(randomBin, Infinity);
+
+        document.getElementById(`${prefix}-name`).innerText = `RAND_${Math.floor(Math.random() * 8999 + 1000)}`;
+        document.getElementById(`${prefix}-color`).style.color = targetEngine.intrinsicColor;
+        document.getElementById(`${prefix}-color`).innerText   = targetEngine.intrinsicColor.toUpperCase();
+
+        targetEngine.render();
+        updateHUD();
+    }
+
+    // 2. Draws a curated, long-lived/registered Glyph from the user database
+    function loadDatabaseGlyph(source) {
+        if (!databaseGlyphs || databaseGlyphs.length === 0) {
+            alert("No registered database Glyphs available! Spawn random seeds or log in to mine custom Glyphs.");
+            return;
+        }
+
+        const targetEngine = source === 'alpha' ? alphaEngine : betaEngine;
+        const prefix = source === 'alpha' ? 'alpha' : 'beta';
+
+        const randomDbGlyph = getRandomDatabaseGlyph();
+        targetEngine.loadFromBinary(randomDbGlyph.BIN, parseInt(randomDbGlyph.GENERATIONS) || 500);
+
+        document.getElementById(`${prefix}-name`).innerText = randomDbGlyph.BATTLE_NAME;
+        document.getElementById(`${prefix}-color`).style.color = targetEngine.intrinsicColor;
+        document.getElementById(`${prefix}-color`).innerText   = targetEngine.intrinsicColor.toUpperCase();
+
+        targetEngine.render();
+        updateHUD();
     }
 
     function updateGravity(value) {
         const val = parseFloat(value);
         document.getElementById('gravity-val').innerText = val;
 
-        // Grab the attractor module and update its strength directly
-        const well = arena.modules.get('gravity_well_1');
-        if (well) {
-            well.strength = val;
-        }
+        // Synchronize strength across both vertical attractors
+        const topWell = arena.modules.get('gravity_top');
+        const bottomWell = arena.modules.get('gravity_bottom');
+        if (topWell) topWell.strength = val;
+        if (bottomWell) bottomWell.strength = val;
     }
 
     function cycleBoundaryMode() {

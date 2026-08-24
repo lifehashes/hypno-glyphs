@@ -385,3 +385,57 @@ class ArenaManager {
         }
     }
 }
+
+/**
+ * Sink / Drain Module (Destroys particles & increments score for emitter)
+ */
+class SinkModule extends ArenaModule {
+    constructor(id, x, y, width = 70, height = 70, scoreTracker) {
+        super(id, x, y, width, height, 'SINK');
+        this.scoreTracker = scoreTracker; // Reference to track score state
+        this.radius = Math.min(width, height) / 2;
+    }
+
+    affectParticle(particle, dt) {
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+
+        // Drain particle if inside sink boundary
+        if (distSq <= (this.radius * 0.8) ** 2) {
+            particle.dead = true;
+
+            // Increment score for emitting source
+            if (particle.sourceId === 'alpha_src') {
+                this.scoreTracker.alphaScore++;
+            } else if (particle.sourceId === 'beta_src') {
+                this.scoreTracker.betaScore++;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        ctx.save();
+        
+        // Vortex core visual
+        ctx.strokeStyle = '#00ffff';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00ffff';
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = '9px monospace';
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
+        ctx.fillText('DRAIN SINK', this.x + 8, this.y + 12);
+        ctx.restore();
+    }
+}
