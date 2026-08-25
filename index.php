@@ -9,7 +9,7 @@
 
     // TRACK SITE VISITS
     $site_token = 'HYPNO-GLYPHS';    
-    $session_key = 'has_logged_' . $site_token; // Tracking key per site so visiting Sub-site A doesn't block logging Sub-site B
+    $session_key = 'has_logged_' . $site_token;
 
     if (!isset($_SESSION[$session_key])) {
         try {
@@ -53,7 +53,64 @@
     <SCRIPT SRC="js/hypnophysics.js"></SCRIPT>
     <SCRIPT SRC="js/sha256.js"></SCRIPT>	
     <link rel="stylesheet" href="styles.css">
-    <style></style>
+    <style>
+
+        /* Palette Container Sidebar */
+        .editor-palette-box {
+            display: none; /* Toggled via JS */
+            flex-direction: column;
+            gap: 8px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .palette-card {
+            background: rgba(15, 20, 30, 0.7);
+            border: 1px solid rgba(66, 244, 133, 0.2);
+            border-radius: 4px;
+            padding: 8px 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: grab;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .palette-card:hover {
+            background: rgba(66, 244, 133, 0.12);
+            border-color: #42f485;
+            box-shadow: 0 0 10px rgba(66, 244, 133, 0.3);
+        }
+
+        .palette-card:active {
+            cursor: grabbing;
+        }
+
+        .palette-card svg {
+            width: 32px;
+            height: 32px;
+            display: block;
+        }
+
+        .palette-card span {
+            font-family: monospace;
+            font-size: 9px;
+            color: #d1d5db;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+    </style>
 </head>
 <body>
 
@@ -67,8 +124,8 @@
     </div>
 
     <div class="duel-stage">
-        <!-- SOURCE MODULE ALPHA -->
-        <div class="player-box">
+        <!-- SOURCE MODULE ALPHA (PLAY MODE) -->
+        <div class="player-box" id="alpha-panel">
             <div class="pane-title">SOURCE :: ALPHA</div>
             <div class="glyph-preview">
                 <canvas id="glyph-alpha-canvas" width="128" height="128"></canvas>
@@ -93,7 +150,6 @@
                 <span>SCORE:</span>
                 <span class="stat-value" id="alpha-score" style="color:#00ffff; font-weight:bold;">0</span>
             </div>
-            <!-- NEW HASH READOUTS -->
             <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
                 <span style="font-size:10px; opacity:0.6;">ORIGIN HASH:</span>
                 <span class="stat-value" id="alpha-origin-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
@@ -105,6 +161,85 @@
             <div style="display:flex; gap:6px; margin-top:10px;">
                 <button class="load-btn" style="flex:1;" onclick="loadRandomSeed('alpha')">RANDOM SEED</button>
                 <button class="load-btn" style="flex:1; background:rgba(0, 255, 255, 0.15); border-color:#00ffff;" onclick="loadDatabaseGlyph('alpha')">DB DRAW</button>
+            </div>
+        </div>
+
+        <!-- MODULE PALETTE DRAWER (EDIT MODE) -->
+        <div class="player-box editor-palette-box" id="editor-panel">
+            <div class="pane-title" style="color:#00ffff; border-color:#00ffff;">EDITOR // PALETTE</div>
+            <div class="palette-grid">
+                <!-- ATTRACTOR -->
+                <div class="palette-card" draggable="true" data-type="ATTRACTOR">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="10" stroke="#ff3366" stroke-width="1.5" fill="none"/>
+                        <circle cx="16" cy="16" r="3" fill="#ff3366"/>
+                    </svg>
+                    <span>ATTRACTOR</span>
+                </div>
+                <!-- SINK -->
+                <div class="palette-card" draggable="true" data-type="SINK">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#00ffff" stroke-width="1.5" fill="none"/>
+                        <circle cx="16" cy="16" r="3" fill="#00ffff"/>
+                    </svg>
+                    <span>DRAIN SINK</span>
+                </div>
+                <!-- QCD INVERTER -->
+                <div class="palette-card" draggable="true" data-type="QCD_INVERTER">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#ff00ff" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>
+                        <path d="M11 16 L21 16 M18 13 L21 16 L18 19" stroke="#ff00ff" stroke-width="1.5" fill="none"/>
+                    </svg>
+                    <span>QCD INVERT</span>
+                </div>
+                <!-- DOUBLER -->
+                <div class="palette-card" draggable="true" data-type="DOUBLER">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="12" stroke="#ffbb00" stroke-width="1.5" fill="none"/>
+                        <circle cx="16" cy="16" r="6" stroke="#ffbb00" stroke-width="1.5" fill="none"/>
+                    </svg>
+                    <span>DOUBLER</span>
+                </div>
+                <!-- CHARGER POS -->
+                <div class="palette-card" draggable="true" data-type="CHARGER_POS">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#00e1ff" stroke-width="1.5" fill="none"/>
+                        <path d="M16 10 V22 M10 16 H22" stroke="#00e1ff" stroke-width="2"/>
+                    </svg>
+                    <span>+ CHARGER</span>
+                </div>
+                <!-- CHARGER NEG -->
+                <div class="palette-card" draggable="true" data-type="CHARGER_NEG">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#ff3366" stroke-width="1.5" fill="none"/>
+                        <path d="M10 16 H22" stroke="#ff3366" stroke-width="2"/>
+                    </svg>
+                    <span>- CHARGER</span>
+                </div>
+                <!-- CAPACITOR -->
+                <div class="palette-card" draggable="true" data-type="CAPACITOR">
+                    <svg viewBox="0 0 32 32">
+                        <path d="M11 8 V24 M21 8 V24" stroke="#00e1ff" stroke-width="2"/>
+                        <path d="M14 16 H18" stroke="#00e1ff" stroke-width="1.5"/>
+                    </svg>
+                    <span>CAPACITOR</span>
+                </div>
+                <!-- KINETIC BOOST -->
+                <div class="palette-card" draggable="true" data-type="KINETIC_BOOST">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#ff9900" stroke-width="1.5" fill="none"/>
+                        <path d="M10 18 L16 12 L22 18" stroke="#ff9900" stroke-width="2" fill="none"/>
+                    </svg>
+                    <span>BOOST 2X</span>
+                </div>
+                <!-- KINETIC SLOW -->
+                <div class="palette-card" draggable="true" data-type="KINETIC_SLOW">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#00bfff" stroke-width="1.5" fill="none"/>
+                        <path d="M10 14 L16 20 L22 14" stroke="#00bfff" stroke-width="2" fill="none"/>
+                    </svg>
+                    <span>SLOW 0.5X</span>
+                </div>
             </div>
         </div>
 
@@ -139,7 +274,6 @@
                 <span>SCORE:</span>
                 <span class="stat-value" id="beta-score" style="color:#00ffff; font-weight:bold;">0</span>
             </div>
-            <!-- NEW HASH READOUTS -->
             <div class="stat-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
                 <span style="font-size:10px; opacity:0.6;">ORIGIN HASH:</span>
                 <span class="stat-value" id="beta-origin-hash" style="font-size:9px; word-break:break-all; font-family:monospace;">-</span>
@@ -157,6 +291,7 @@
 
     <div class="controls-bar">
         <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">ENGAGE ENGINE</button>
+        <button class="help-btn" id="edit-mode-btn" onclick="toggleEditMode()">EDIT MODE: OFF</button>
         <button class="help-btn" id="global-gravity-btn" onclick="toggleGlobalGravity()">GRAVITY DOWN: OFF</button>
         
         <!-- Gravity Slider -->
@@ -181,25 +316,21 @@
 </div>
 
 <script>
-    // 1. Core State & Variable Declarations (Declared FIRST)
     const databaseGlyphs = <?php echo json_encode($myGlyphs ?: []); ?>;
     const canvas = document.getElementById('physics-canvas');
     let isRunning = false;
 
-    // 2. Engines & Arena Manager
     const alphaEngine = new LifeEngine('glyph-alpha-canvas', 16);
     const betaEngine  = new LifeEngine('glyph-beta-canvas', 16);
     const arena       = new ArenaManager('physics-canvas');
     const scores = { alphaScore: 0, betaScore: 0 };
 
-    // Helper to select a random glyph from the database array
     function getRandomDatabaseGlyph() {
         if (!databaseGlyphs || databaseGlyphs.length === 0) return null;
         const randomIndex = Math.floor(Math.random() * databaseGlyphs.length);
         return databaseGlyphs[randomIndex];
     }
 
-    // 3. Module & Seed Setup Function
     function loadInitialGlyphs() {
         if (databaseGlyphs.length > 0) {
             const alphaData = databaseGlyphs[0];
@@ -223,7 +354,6 @@
         document.getElementById('beta-color').style.color  = betaEngine.intrinsicColor;
         document.getElementById('beta-color').innerText    = betaEngine.intrinsicColor.toUpperCase();
 
-        // Canvas Layout Dimensions
         const modWidth = 70;
         const modHeight = 70;
         const padding = 20;
@@ -237,39 +367,31 @@
         const alphaX = padding;
         const betaX  = stageWidth - modWidth - padding;
 
-        // 1. Register Source Modules
         arena.addModule(new SourceSpawnModule('alpha_src', alphaX, centerY, modWidth, modHeight, alphaEngine, 'ALPHA'));
         arena.addModule(new SourceSpawnModule('beta_src', betaX, centerY, modWidth, modHeight, betaEngine, 'BETA'));
         
-        // 2. Center Score Sink Module
         arena.addModule(new SinkModule('center_sink', centerX, centerY, modWidth, modHeight, scores));
 
-        // 3. Two Gravity Modules on Vertical Axis (Above and Below Center Sink)
         const verticalOffset = 150;
         const currentGravity = parseFloat(document.getElementById('gravity-slider').value) || 8000;
 
         arena.addModule(new AttractorModule('gravity_top', centerX, centerY - verticalOffset, modWidth, modHeight, currentGravity));
         arena.addModule(new AttractorModule('gravity_bottom', centerX, centerY + verticalOffset, modWidth, modHeight, currentGravity));
 
-        // 4. QCD Inverter modules
         const horizontalOffset = 160;
         arena.addModule(new QCDInverterModule('qcd_left', centerX - horizontalOffset, centerY, modWidth, modHeight));
         arena.addModule(new QCDInverterModule('qcd_right', centerX + horizontalOffset, centerY, modWidth, modHeight));
 
-        // 5. Add Doublers above and below QCD Inverters
         arena.addModule(new DoublerModule('doubler_top', centerX - horizontalOffset, centerY - verticalOffset, modWidth, modHeight));
         arena.addModule(new DoublerModule('doubler_bottom', centerX + horizontalOffset, centerY + verticalOffset, modWidth, modHeight));  
         
-        // Place +CHARGER and -CHARGER modules on the arena grid
         arena.addModule(new ChargerModule('charger_pos', centerX - horizontalOffset, centerY + verticalOffset, modWidth, modHeight, +1));
         arena.addModule(new ChargerModule('charger_neg', centerX + horizontalOffset, centerY - verticalOffset, modWidth, modHeight, -1));
 
-        // Place Positive and Negative Capacitors into the Arena grid
         const currentCapacitorStrength = parseFloat(document.getElementById('capacitor-slider').value) || 18000;
         arena.addModule(new CapacitorModule('cap_pos', centerX - horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 4, currentCapacitorStrength));
         arena.addModule(new CapacitorModule('cap_neg', centerX + horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, -4, currentCapacitorStrength));
 
-        // 6. Add Kinetic Converter Modules
         arena.addModule(new KineticConverterModule('kinetic_fast', centerX - horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, 'double'));
         arena.addModule(new KineticConverterModule('kinetic_slow', centerX + horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 'half'));
 
@@ -291,7 +413,6 @@
     const resizeObserver = new ResizeObserver(() => resizeCanvas());
     resizeObserver.observe(canvas.parentElement);
 
-    // Initial positioning setup
     resizeCanvas();
     loadInitialGlyphs();
 
@@ -307,7 +428,6 @@
         document.getElementById('alpha-particles').innerText = alphaCount;
         document.getElementById('beta-particles').innerText  = betaCount;
 
-        // Score Readouts
         document.getElementById('alpha-score').innerText = scores.alphaScore;
         document.getElementById('beta-score').innerText  = scores.betaScore;
 
@@ -329,10 +449,9 @@
 
             updateHUD();
 
-            // Real-time FPS Calculation
             frameCount++;
             const now = performance.now();
-            if (now - lastFpsUpdate >= 500) { // Update readout twice a second
+            if (now - lastFpsUpdate >= 500) {
                 const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
                 document.getElementById('fps-counter').innerText = fps;
                 frameCount = 0;
@@ -359,7 +478,6 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 1. Spawns pure, high-entropy random binary noise (Infinite maxGen until halt)
     function loadRandomSeed(source) {
         const targetEngine = source === 'alpha' ? alphaEngine : betaEngine;
         const prefix = source === 'alpha' ? 'alpha' : 'beta';
@@ -375,10 +493,9 @@
         updateHUD();
     }
 
-    // 2. Draws a curated, long-lived/registered Glyph from the user database
     function loadDatabaseGlyph(source) {
         if (!databaseGlyphs || databaseGlyphs.length === 0) {
-            alert("No registered database Glyphs available! Spawn random seeds or log in to mine custom Glyphs.");
+            alert("No registered database Glyphs available!");
             return;
         }
 
@@ -400,7 +517,6 @@
         const val = parseFloat(value);
         document.getElementById('gravity-val').innerText = val;
 
-        // Synchronize strength across both vertical attractors
         const topWell = arena.modules.get('gravity_top');
         const bottomWell = arena.modules.get('gravity_bottom');
         if (topWell) topWell.strength = val;
@@ -447,6 +563,108 @@
             btn.style.color = "";
         }
     }
+
+    // Toggle Panel between Source Alpha & Palette
+    let isEditMode = false;
+    let moduleCounter = 0;
+
+    function toggleEditMode() {
+        isEditMode = !isEditMode;
+        const btn = document.getElementById('edit-mode-btn');
+        const alphaPanel = document.getElementById('alpha-panel');
+        const editorPanel = document.getElementById('editor-panel');
+
+        if (isEditMode) {
+            btn.innerText = "EDIT MODE: ON";
+            btn.style.borderColor = "#00ffff";
+            btn.style.color = "#00ffff";
+
+            // Hide Alpha, Show Palette
+            alphaPanel.style.display = "none";
+            editorPanel.style.display = "flex";
+        } else {
+            btn.innerText = "EDIT MODE: OFF";
+            btn.style.borderColor = "";
+            btn.style.color = "";
+
+            // Restore Alpha Panel
+            editorPanel.style.display = "none";
+            alphaPanel.style.display = "flex";
+        }
+    }
+
+    function createModuleByType(type, id, x, y, width = 70, height = 70) {
+        const currentGravity = parseFloat(document.getElementById('gravity-slider').value) || 8000;
+        const currentCap = parseFloat(document.getElementById('capacitor-slider').value) || 18000;
+
+        switch (type) {
+            case 'ATTRACTOR':
+                return new AttractorModule(id, x, y, width, height, currentGravity);
+            case 'SINK':
+                return new SinkModule(id, x, y, width, height, scores);
+            case 'QCD_INVERTER':
+                return new QCDInverterModule(id, x, y, width, height);
+            case 'DOUBLER':
+                return new DoublerModule(id, x, y, width, height);
+            case 'CHARGER_POS':
+                return new ChargerModule(id, x, y, width, height, 1);
+            case 'CHARGER_NEG':
+                return new ChargerModule(id, x, y, width, height, -1);
+            case 'CAPACITOR':
+                return new CapacitorModule(id, x, y, width, height, 2, currentCap);
+            case 'KINETIC_BOOST':
+                return new KineticConverterModule(id, x, y, width, height, 'double');
+            case 'KINETIC_SLOW':
+                return new KineticConverterModule(id, x, y, width, height, 'half');
+            default:
+                return null;
+        }
+    }
+
+    function setupPaletteDragAndDrop() {
+        const paletteCards = document.querySelectorAll('.palette-card');
+
+        paletteCards.forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', card.dataset.type);
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+        });
+
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('text/plain');
+            if (!type) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const modWidth = 70;
+            const modHeight = 70;
+
+            let dropX = e.clientX - rect.left - (modWidth / 2);
+            let dropY = e.clientY - rect.top - (modHeight / 2);
+
+            const gridSize = 80;
+            dropX = Math.round(dropX / gridSize) * gridSize;
+            dropY = Math.round(dropY / gridSize) * gridSize;
+
+            dropX = Math.max(0, Math.min(canvas.width - modWidth, dropX));
+            dropY = Math.max(0, Math.min(canvas.height - modHeight, dropY));
+
+            const uniqueId = `custom_${type.toLowerCase()}_${Date.now()}_${moduleCounter++}`;
+            const newModule = createModuleByType(type, uniqueId, dropX, dropY, modWidth, modHeight);
+
+            if (newModule) {
+                arena.addModule(newModule);
+            }
+        });
+    }
+
+    setupPaletteDragAndDrop();
 
 </script>
 
