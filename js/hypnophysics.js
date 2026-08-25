@@ -82,7 +82,7 @@ class Particle {
  * Base container footprint (e.g. 70x70) for grid-packing 20-50 modules.
  */
 class ArenaModule {
-    constructor(id, x, y, width = 70, height = 70, type = 'GENERIC') {
+    constructor(id, x, y, width = 80, height = 80, type = 'GENERIC') {
         this.id = id;
         this.x = x;
         this.y = y;
@@ -102,11 +102,19 @@ class ArenaModule {
     affectParticle(particle, dt) {}
 
     draw(ctx) {
-        // Render modular border footprint
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        // Safely check window.selectedModule without throwing a ReferenceError
+        if (typeof window !== 'undefined' && window.selectedModule === this) {
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffff';
+            ctx.strokeRect(this.x - 2, this.y - 2, this.width + 4, this.height + 4);
+        } else {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+        }
         ctx.restore();
     }
 }
@@ -553,13 +561,111 @@ class ArenaManager {
         }
     }
 
+    /**
+     * Calculates responsive integer-based primary and secondary grid step sizes.
+     * Ensures strict mathematical alignment regardless of canvas width/height.
+     */
+    getGridDimensions(baseCellSize = 80, subDivisions = 4) {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        // Determine total integer columns/rows that cleanly fit or divide the space
+        const cols = Math.max(1, Math.round(w / baseCellSize));
+        const rows = Math.max(1, Math.round(h / baseCellSize));
+
+        // Integer primary grid step
+        const primaryStepX = w / cols;
+        const primaryStepY = h / rows;
+
+        // Subdivided fine grid step
+        const secondaryStepX = primaryStepX / subDivisions;
+        const secondaryStepY = primaryStepY / subDivisions;
+
+        return {
+            cols,
+            rows,
+            primaryStepX,
+            primaryStepY,
+            secondaryStepX,
+            secondaryStepY,
+            subDivisions
+        };
+    }
+
+    /**
+     * Renders two-tier helper grid overlay in Edit Mode.
+     */
+    drawEditGrid(baseCellSize = 80, subDivisions = 4) {
+        const grid = this.getGridDimensions(baseCellSize, subDivisions);
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        ctx.save();
+
+        // 1. Draw Secondary Grid (Finer, thin lines)
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+
+        for (let x = 0; x <= w; x += grid.secondaryStepX) {
+            ctx.moveTo(Math.round(x) + 0.5, 0);
+            ctx.lineTo(Math.round(x) + 0.5, h);
+        }
+        for (let y = 0; y <= h; y += grid.secondaryStepY) {
+            ctx.moveTo(0, Math.round(y) + 0.5);
+            ctx.lineTo(w, Math.round(y) + 0.5);
+        }
+        ctx.stroke();
+
+        // 2. Draw Primary Grid (Thicker, prominent lines)
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.18)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+
+        for (let x = 0; x <= w; x += grid.primaryStepX) {
+            ctx.moveTo(Math.round(x) + 0.5, 0);
+            ctx.lineTo(Math.round(x) + 0.5, h);
+        }
+        for (let y = 0; y <= h; y += grid.primaryStepY) {
+            ctx.moveTo(0, Math.round(y) + 0.5);
+            ctx.lineTo(w, Math.round(y) + 0.5);
+        }
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    renderOnly() {
+        // Clear canvas
+        this.ctx.fillStyle = 'rgba(5, 5, 5, 1)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Draw Helper Grid if Edit Mode is enabled
+        if (typeof window !== 'undefined' && window.isEditMode) {
+            this.drawEditGrid(80, 4); // 80px Primary Grid, 4 Subdivisions (20px fine grid)
+        }
+
+        // Render existing particles (if paused mid-simulation)
+        this.particles.forEach(p => p.draw(this.ctx));
+
+        // Render boundary lines and dropped modules
+        this.drawBoundaryVisuals();
+        this.modules.forEach(mod => mod.draw(this.ctx));
+    }
+
+    removeModule(idOrModule) {
+        const id = typeof idOrModule === 'string' ? idOrModule : idOrModule.id;
+        this.modules.delete(id);
+    }
+
 }
 
 /**
  * Sink / Drain Module (Destroys particles & increments/decrements score based on charge magnitude)
  */
 class SinkModule extends ArenaModule {
-    constructor(id, x, y, width = 70, height = 70, scoreTracker) {
+    constructor(id, x, y, width = 80, height = 80, scoreTracker) {
         super(id, x, y, width, height, 'SINK');
         this.scoreTracker = scoreTracker; // Reference to track score state
         this.radius = Math.min(width, height) / 2;
@@ -580,9 +686,9 @@ class SinkModule extends ArenaModule {
             const scoreMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
             const delta = (particle.isAnti ? -1 : 1) * scoreMultiplier;
 
-            if (particle.sourceId === 'alpha_src') {
+            if (particle.sourceId && particle.sourceId.includes('alpha')) {
                 this.scoreTracker.alphaScore += delta;
-            } else if (particle.sourceId === 'beta_src') {
+            } else if (particle.sourceId && particle.sourceId.includes('beta')) {
                 this.scoreTracker.betaScore += delta;
             }
         }
@@ -619,7 +725,7 @@ class SinkModule extends ArenaModule {
  * Matter -> Anti-Matter, and Anti-Matter -> Matter.
  */
 class QCDInverterModule extends ArenaModule {
-    constructor(id, x, y, width = 70, height = 70) {
+    constructor(id, x, y, width = 80, height = 80) {
         super(id, x, y, width, height, 'QCD_INVERTER');
         this.radius = Math.min(width, height) / 2;
         this.pulseAngle = 0;
@@ -729,7 +835,7 @@ class ExplosionFlash {
  * Spawns a clone particle upon entry and applies a slight trajectory divergence.
  */
 class DoublerModule extends ArenaModule {
-    constructor(id, x, y, width = 70, height = 70) {
+    constructor(id, x, y, width = 80, height = 80) {
         super(id, x, y, width, height, 'DOUBLER');
         this.radius = Math.min(width, height) / 2;
         // Tracks particles that have already passed through to prevent infinite duplication loop
@@ -812,7 +918,7 @@ class DoublerModule extends ArenaModule {
  * Imbues positive or negative electrical charge to passing particles (capped at +/-4).
  */
 class ChargerModule extends ArenaModule {
-    constructor(id, x, y, width = 70, height = 70, polarity = 1) {
+    constructor(id, x, y, width = 80, height = 80, polarity = 1) {
         super(id, x, y, width, height, 'CHARGER');
         this.polarity = Math.sign(polarity) || 1; // +1 or -1
         this.radius = Math.min(width, height) / 2;
@@ -873,7 +979,7 @@ class ChargerModule extends ArenaModule {
  * Carries a strong fixed electrical charge and attracts/repels charged particles.
  */
 class CapacitorModule extends ArenaModule {
-    constructor(id, x, y, width = 70, height = 70, chargeVal = 2, strength = 18000) {
+    constructor(id, x, y, width = 80, height = 80, chargeVal = 2, strength = 18000) {
         super(id, x, y, width, height, 'CAPACITOR');
         this.chargeVal = chargeVal; // Fixed charge (+ / -)
         this.strength = strength;   // Force scaling multiplier
@@ -942,7 +1048,7 @@ class CapacitorModule extends ArenaModule {
  * mode: 'double' | 'half' (or multiplier value like 2.0 / 0.5)
  */
 class KineticConverterModule extends ArenaModule {
-    constructor(id, x, y, width = 70, height = 70, mode = 'double') {
+    constructor(id, x, y, width = 80, height = 80, mode = 'double') {
         super(id, x, y, width, height, 'KINETIC_CONVERTER');
         this.mode = mode; // 'double' or 'half'
         this.multiplier = mode === 'half' ? 0.5 : 2.0;

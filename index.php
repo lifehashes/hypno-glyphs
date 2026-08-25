@@ -168,6 +168,23 @@
         <div class="player-box editor-palette-box" id="editor-panel">
             <div class="pane-title" style="color:#00ffff; border-color:#00ffff;">EDITOR // PALETTE</div>
             <div class="palette-grid">
+                <!-- SOURCE ALPHA -->
+                <div class="palette-card" draggable="true" data-type="SOURCE_ALPHA">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="6" y="6" width="20" height="20" stroke="#42f485" stroke-width="1.5" fill="none"/>
+                        <circle cx="16" cy="16" r="4" fill="#42f485"/>
+                    </svg>
+                    <span>SOURCE ALPHA</span>
+                </div>
+
+                <!-- SOURCE BETA -->
+                <div class="palette-card" draggable="true" data-type="SOURCE_BETA">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="6" y="6" width="20" height="20" stroke="#00e1ff" stroke-width="1.5" fill="none"/>
+                        <circle cx="16" cy="16" r="4" fill="#00e1ff"/>
+                    </svg>
+                    <span>SOURCE BETA</span>
+                </div>
                 <!-- ATTRACTOR -->
                 <div class="palette-card" draggable="true" data-type="ATTRACTOR">
                     <svg viewBox="0 0 32 32">
@@ -354,8 +371,8 @@
         document.getElementById('beta-color').style.color  = betaEngine.intrinsicColor;
         document.getElementById('beta-color').innerText    = betaEngine.intrinsicColor.toUpperCase();
 
-        const modWidth = 70;
-        const modHeight = 70;
+        const modWidth = 80;
+        const modHeight = 80;
         const padding = 20;
 
         const stageWidth = canvas.width || 800;
@@ -367,18 +384,23 @@
         const alphaX = padding;
         const betaX  = stageWidth - modWidth - padding;
 
+        /*
         arena.addModule(new SourceSpawnModule('alpha_src', alphaX, centerY, modWidth, modHeight, alphaEngine, 'ALPHA'));
         arena.addModule(new SourceSpawnModule('beta_src', betaX, centerY, modWidth, modHeight, betaEngine, 'BETA'));
         
         arena.addModule(new SinkModule('center_sink', centerX, centerY, modWidth, modHeight, scores));
+        */
 
         const verticalOffset = 150;
         const currentGravity = parseFloat(document.getElementById('gravity-slider').value) || 8000;
 
+        /*
         arena.addModule(new AttractorModule('gravity_top', centerX, centerY - verticalOffset, modWidth, modHeight, currentGravity));
         arena.addModule(new AttractorModule('gravity_bottom', centerX, centerY + verticalOffset, modWidth, modHeight, currentGravity));
+        */
 
         const horizontalOffset = 160;
+        /*
         arena.addModule(new QCDInverterModule('qcd_left', centerX - horizontalOffset, centerY, modWidth, modHeight));
         arena.addModule(new QCDInverterModule('qcd_right', centerX + horizontalOffset, centerY, modWidth, modHeight));
 
@@ -387,13 +409,16 @@
         
         arena.addModule(new ChargerModule('charger_pos', centerX - horizontalOffset, centerY + verticalOffset, modWidth, modHeight, +1));
         arena.addModule(new ChargerModule('charger_neg', centerX + horizontalOffset, centerY - verticalOffset, modWidth, modHeight, -1));
+        */
 
         const currentCapacitorStrength = parseFloat(document.getElementById('capacitor-slider').value) || 18000;
+        /*
         arena.addModule(new CapacitorModule('cap_pos', centerX - horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 4, currentCapacitorStrength));
         arena.addModule(new CapacitorModule('cap_neg', centerX + horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, -4, currentCapacitorStrength));
 
         arena.addModule(new KineticConverterModule('kinetic_fast', centerX - horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, 'double'));
         arena.addModule(new KineticConverterModule('kinetic_slow', centerX + horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 'half'));
+        */
 
     }
 
@@ -423,8 +448,8 @@
         document.getElementById('alpha-gen').innerText = `${alphaEngine.iteration} / ${alphaMaxStr}`;
         document.getElementById('beta-gen').innerText  = `${betaEngine.iteration} / ${betaMaxStr}`;
 
-        const alphaCount = arena.particles.filter(p => p.sourceId === 'alpha_src').length;
-        const betaCount  = arena.particles.filter(p => p.sourceId === 'beta_src').length;
+        const alphaCount = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha')).length;
+        const betaCount  = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta')).length;
         document.getElementById('alpha-particles').innerText = alphaCount;
         document.getElementById('beta-particles').innerText  = betaCount;
 
@@ -443,10 +468,8 @@
     function loop() {
         if (isRunning) {
             arena.updateAndRender();
-            
             alphaEngine.render();
             betaEngine.render();
-
             updateHUD();
 
             frameCount++;
@@ -457,6 +480,9 @@
                 frameCount = 0;
                 lastFpsUpdate = now;
             }
+        } else {
+            // Render arena state while paused or editing
+            arena.renderOnly();
         }
         requestAnimationFrame(loop);
     }
@@ -517,10 +543,17 @@
         const val = parseFloat(value);
         document.getElementById('gravity-val').innerText = val;
 
-        const topWell = arena.modules.get('gravity_top');
-        const bottomWell = arena.modules.get('gravity_bottom');
-        if (topWell) topWell.strength = val;
-        if (bottomWell) bottomWell.strength = val;
+        // Iterate through all placed modules in the arena
+        arena.modules.forEach(mod => {
+            if (mod.type === 'ATTRACTOR') {
+                mod.strength = val;
+            }
+        });
+
+        // Re-render canvas immediately if the engine is currently paused
+        if (!isRunning) {
+            arena.renderOnly();
+        }
     }
 
     function updateCapacitorStrength(value) {
@@ -532,6 +565,11 @@
                 mod.strength = val;
             }
         });
+
+        // Re-render immediately if the simulation is paused
+        if (!isRunning) {
+            arena.renderOnly();
+        }
     }
 
     function cycleBoundaryMode() {
@@ -565,16 +603,16 @@
     }
 
     // Toggle Panel between Source Alpha & Palette
-    let isEditMode = false;
+    window.isEditMode = false;
     let moduleCounter = 0;
 
     function toggleEditMode() {
-        isEditMode = !isEditMode;
+        window.isEditMode = !window.isEditMode; // Bind directly to window
         const btn = document.getElementById('edit-mode-btn');
         const alphaPanel = document.getElementById('alpha-panel');
         const editorPanel = document.getElementById('editor-panel');
 
-        if (isEditMode) {
+        if (window.isEditMode) {
             btn.innerText = "EDIT MODE: ON";
             btn.style.borderColor = "#00ffff";
             btn.style.color = "#00ffff";
@@ -591,13 +629,22 @@
             editorPanel.style.display = "none";
             alphaPanel.style.display = "flex";
         }
+        
+        // Force a re-render frame immediately on toggle
+        if (!isRunning) {
+            arena.renderOnly();
+        }
     }
 
-    function createModuleByType(type, id, x, y, width = 70, height = 70) {
+    function createModuleByType(type, id, x, y, width = 80, height = 80) {
         const currentGravity = parseFloat(document.getElementById('gravity-slider').value) || 8000;
         const currentCap = parseFloat(document.getElementById('capacitor-slider').value) || 18000;
 
         switch (type) {
+            case 'SOURCE_ALPHA':
+                return new SourceSpawnModule(id || 'alpha_src', x, y, width, height, alphaEngine, 'ALPHA');
+            case 'SOURCE_BETA':
+                return new SourceSpawnModule(id || 'beta_src', x, y, width, height, betaEngine, 'BETA');
             case 'ATTRACTOR':
                 return new AttractorModule(id, x, y, width, height, currentGravity);
             case 'SINK':
@@ -642,15 +689,16 @@
             if (!type) return;
 
             const rect = canvas.getBoundingClientRect();
-            const modWidth = 70;
-            const modHeight = 70;
+            const modWidth = 80;
+            const modHeight = 80;
 
             let dropX = e.clientX - rect.left - (modWidth / 2);
             let dropY = e.clientY - rect.top - (modHeight / 2);
 
-            const gridSize = 80;
-            dropX = Math.round(dropX / gridSize) * gridSize;
-            dropY = Math.round(dropY / gridSize) * gridSize;
+            // Snap to secondary (fine) grid step
+            const grid = arena.getGridDimensions(80, 4);
+            dropX = Math.round(dropX / grid.secondaryStepX) * grid.secondaryStepX;
+            dropY = Math.round(dropY / grid.secondaryStepY) * grid.secondaryStepY;
 
             dropX = Math.max(0, Math.min(canvas.width - modWidth, dropX));
             dropY = Math.max(0, Math.min(canvas.height - modHeight, dropY));
@@ -660,11 +708,128 @@
 
             if (newModule) {
                 arena.addModule(newModule);
+                if (!isRunning) arena.renderOnly();
             }
         });
+
     }
 
     setupPaletteDragAndDrop();
+
+    // --- PHASE 1: CANVAS SELECTION & DRAGGING ---
+    let selectedModule = null;
+    let isDraggingModule = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+        // Only allow selecting/dragging modules when Edit Mode is active
+        if (!window.isEditMode) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Search backwards so top-most/last-added modules are selected first
+        let clickedModule = null;
+        const modulesArray = Array.from(arena.modules.values());
+        
+        for (let i = modulesArray.length - 1; i >= 0; i--) {
+            const mod = modulesArray[i];
+            // Check bounding box hit
+            if (mouseX >= mod.x && mouseX <= mod.x + mod.width &&
+                mouseY >= mod.y && mouseY <= mod.y + mod.height) {
+                clickedModule = mod;
+                break;
+            }
+        }
+
+        if (clickedModule) {
+            selectedModule = clickedModule;
+            isDraggingModule = true;
+            
+            // Calculate offset so module doesn't snap its top-left corner to cursor on click
+            dragOffsetX = mouseX - selectedModule.x;
+            dragOffsetY = mouseY - selectedModule.y;
+        } else {
+            // Clicked on empty canvas space
+            selectedModule = null;
+        }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDraggingModule || !selectedModule) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        let rawX = mouseX - dragOffsetX;
+        let rawY = mouseY - dragOffsetY;
+
+        // Dynamic grid snapping based on responsive screen divisions
+        const grid = arena.getGridDimensions(80, 4);
+        let newX = Math.round(rawX / grid.secondaryStepX) * grid.secondaryStepX;
+        let newY = Math.round(rawY / grid.secondaryStepY) * grid.secondaryStepY;
+
+        newX = Math.max(0, Math.min(canvas.width - selectedModule.width, newX));
+        newY = Math.max(0, Math.min(canvas.height - selectedModule.height, newY));
+
+        selectedModule.x = newX;
+        selectedModule.y = newY;
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDraggingModule = false;
+    });
+
+    window.addEventListener('keydown', (e) => {
+        // Prevent backspace from navigating back in browser when a module is selected
+        if (window.isEditMode && selectedModule && (e.key === 'Delete' || e.key === 'Backspace')) {
+            e.preventDefault();
+            
+            // Prevent accidental deletion of main source emitters
+            if (selectedModule.type !== 'SOURCE_SPAWN') {
+                arena.removeModule(selectedModule);
+                selectedModule = null;
+
+                if (!isRunning) {
+                    arena.renderOnly();
+                }
+            }
+        }
+    });
+
+    canvas.addEventListener('contextmenu', (e) => {
+        if (!window.isEditMode) return;
+        
+        // Prevent native browser context menu from appearing
+        e.preventDefault();
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const modulesArray = Array.from(arena.modules.values());
+        for (let i = modulesArray.length - 1; i >= 0; i--) {
+            const mod = modulesArray[i];
+            if (mouseX >= mod.x && mouseX <= mod.x + mod.width &&
+                mouseY >= mod.y && mouseY <= mod.y + mod.height) {
+                
+                // Do not delete source spawn emitters
+                if (mod.type !== 'SOURCE_SPAWN') {
+                    arena.removeModule(mod);
+                    if (selectedModule === mod) {
+                        selectedModule = null;
+                    }
+                    if (!isRunning) {
+                        arena.renderOnly();
+                    }
+                }
+                break;
+            }
+        }
+    });
 
 </script>
 
