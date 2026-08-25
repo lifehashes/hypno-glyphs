@@ -267,6 +267,9 @@ class ArenaManager {
         this.effects = []; // Visual effect queue
         this.lastTime = performance.now();
         this.boundaryMode = 'none'; // 'none' | 'toroidal' | 'box'
+
+        this.globalGravityEnabled = false;
+        this.globalGravityForce = 300; // Adjust force intensity as desired
     }
 
     addModule(module) { this.modules.set(module.id, module); }
@@ -380,9 +383,14 @@ class ArenaManager {
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
 
+            // NEW: Apply constant vertical acceleration downward if enabled
+            if (this.globalGravityEnabled) {
+                p.ay += this.globalGravityForce;
+            }
+
             this.modules.forEach(mod => {
                 if (mod.affectParticle) {
-                    mod.affectParticle(p, dt, this); // Pass 'this' as arena reference
+                    mod.affectParticle(p, dt, this);
                 }
             });
 
@@ -396,10 +404,9 @@ class ArenaManager {
             }
         }
 
-        // 3. Resolve Particle-to-Particle Collisions
+        // 3. Resolve Particle Collisions & Visuals...
         this.handleParticleCollisions();
 
-        // 3.5 Render Visual Effects (Flashes & Explosions)
         for (let i = this.effects.length - 1; i >= 0; i--) {
             const fx = this.effects[i];
             fx.update(dt);
@@ -409,7 +416,6 @@ class ArenaManager {
             }
         }
 
-        // 4. Render Boundary Visuals & Module Footprints
         this.drawBoundaryVisuals();
         this.modules.forEach(mod => mod.draw(this.ctx));
     }

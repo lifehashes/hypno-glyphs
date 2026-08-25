@@ -157,6 +157,7 @@
 
     <div class="controls-bar">
         <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">ENGAGE ENGINE</button>
+        <button class="help-btn" id="global-gravity-btn" onclick="toggleGlobalGravity()">GRAVITY DOWN: OFF</button>
         
         <!-- Gravity Slider -->
         <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
@@ -430,6 +431,21 @@
 
         arena.boundaryMode = nextMode;
         document.getElementById('boundary-btn').innerText = labels[nextMode];
+    }
+
+    function toggleGlobalGravity() {
+        arena.globalGravityEnabled = !arena.globalGravityEnabled;
+        const btn = document.getElementById('global-gravity-btn');
+        
+        if (arena.globalGravityEnabled) {
+            btn.innerText = "GRAVITY DOWN: ON";
+            btn.style.borderColor = "#42f485";
+            btn.style.color = "#42f485";
+        } else {
+            btn.innerText = "GRAVITY DOWN: OFF";
+            btn.style.borderColor = "";
+            btn.style.color = "";
+        }
     }
 
 </script>
