@@ -275,6 +275,7 @@ class ArenaManager {
         this.effects = []; // Visual effect queue
         this.lastTime = performance.now();
         this.boundaryMode = 'none'; // 'none' | 'toroidal' | 'box'
+        this.clusters = [];
 
         this.globalGravityEnabled = false;
         this.globalGravityForce = 300; // Adjust force intensity as desired
@@ -412,6 +413,15 @@ class ArenaManager {
             }
         }
 
+        // clustering of magnetized particles
+        for (let i = this.clusters.length - 1; i >= 0; i--) {
+            const cluster = this.clusters[i];
+            cluster.update(dt);
+            if (cluster.dead) {
+                this.clusters.splice(i, 1);
+            }
+        }
+
         // 3. Resolve Particle Collisions & Visuals...
         this.handleParticleCollisions();
 
@@ -442,62 +452,51 @@ class ArenaManager {
                 const p2 = this.particles[j];
                 if (p2.dead) continue;
 
-                // RULE 1: Anti-particles do NOT interact with opposite source types (A doesn't see B)
-                if ((p1.isAnti || p2.isAnti) && p1.sourceId !== p2.sourceId) {
-                    continue; 
-                }
+                if ((p1.isAnti || p2.isAnti) && p1.sourceId !== p2.sourceId) continue; 
 
                 const dx = p2.x - p1.x;
                 const dy = p2.y - p1.y;
                 const distSq = dx * dx + dy * dy;
 
                 if (distSq < minDistSq && distSq > 0) {
-                    // RULE 2: Matter / Anti-Matter Annihilation within same source family
+                    
+                    // MAGNETIC CLUSTER STICKING / SHATTERING
+                    if (p1.isMagnetic && p2.isMagnetic) {
+                        if (!p1.cluster && !p2.cluster) {
+                            const cluster = new MagneticCluster(p1, p2);
+                            this.clusters.push(cluster); // <-- ADD THIS LINE
+                        } else if (p1.cluster && !p2.cluster) {
+                            p1.cluster.addParticleNode(p2);
+                        } else if (!p1.cluster && p2.cluster) {
+                            p2.cluster.addParticleNode(p1);
+                        } else if (p1.cluster !== p2.cluster) {
+                            p1.cluster.mergeCluster(p2.cluster);
+                        }
+                        continue;
+                    }
+
+                    // HIGH VELOCITY IMPACT SHATTERS EXISTING CLUSTERS
+                    const relativeSpeed = Math.hypot(p1.vx - p2.vx, p1.vy - p2.vy);
+                    if (relativeSpeed > 300) {
+                        if (p1.cluster) p1.cluster.shatter(this, p2.vx, p2.vy);
+                        if (p2.cluster) p2.cluster.shatter(this, p1.vx, p1.vy);
+                    }
+
+                    // Matter / Anti-Matter Annihilation
                     if (p1.sourceId === p2.sourceId && p1.isAnti !== p2.isAnti) {
                         p1.dead = true;
                         p2.dead = true;
+                        
+                        if (p1.cluster) p1.cluster.shatter(this);
+                        if (p2.cluster) p2.cluster.shatter(this);
 
                         const epicX = (p1.x + p2.x) / 2;
                         const epicY = (p1.y + p2.y) / 2;
-
-                        // Spawn flash effect using the particle's inherent color
                         this.effects.push(new ExplosionFlash(epicX, epicY, 40, p1.color));
-
-                        // Shockwave parameters
-                        const killRadius = 25;       // Inner radius: direct disintegration
-                        const blastRadius = 90;      // Outer radius: physics force blowback
-                        const killRadiusSq = killRadius * killRadius;
-                        const blastRadiusSq = blastRadius * blastRadius;
-                        const blastImpulse = 450;    // Magnitude of velocity imparted
-
-                        for (let k = 0; k < len; k++) {
-                            const pTarget = this.particles[k];
-                            if (pTarget.dead) continue;
-
-                            const bdx = pTarget.x - epicX;
-                            const bdy = pTarget.y - epicY;
-                            const bDistSq = bdx * bdx + bdy * bdy;
-
-                            if (bDistSq <= killRadiusSq) {
-                                // Vaporize particles in the core
-                                pTarget.dead = true;
-                            } else if (bDistSq <= blastRadiusSq && bDistSq > 0) {
-                                // Impart radial blast force to surviving surrounding particles
-                                const bDist = Math.sqrt(bDistSq);
-                                const normX = bdx / bDist;
-                                const normY = bdy / bDist;
-
-                                const falloff = 1 - (bDist / blastRadius);
-                                const force = blastImpulse * falloff;
-
-                                pTarget.vx += normX * force;
-                                pTarget.vy += normY * force;
-                            }
-                        }
-                        break; // Stop checking p1 as it has been annihilated
+                        break;
                     }
 
-                    // Standard elastic physical bounce for normal interactions
+                    // Elastic rebound (if not stuck magnetically)
                     const dist = Math.sqrt(distSq);
                     const nx = dx / dist;
                     const ny = dy / dist;
@@ -672,6 +671,9 @@ class SinkModule extends ArenaModule {
     }
 
     affectParticle(particle, dt) {
+        // Block compound clusters from entering/draining
+        if (particle.cluster) return;
+
         const c = this.center;
         const dx = particle.x - c.x;
         const dy = particle.y - c.y;
@@ -681,7 +683,6 @@ class SinkModule extends ArenaModule {
         if (distSq <= (this.radius * 0.8) ** 2) {
             particle.dead = true;
 
-            // Score magnitude scale: base value modified by absolute charge magnitude |chargeVal|
             const chargeMagnitude = Math.abs(particle.chargeVal);
             const scoreMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
             const delta = (particle.isAnti ? -1 : 1) * scoreMultiplier;
@@ -1222,5 +1223,136 @@ class BricksModule extends ArenaModule {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.fillText('BRICKS', this.x + 4, this.y + 12);
         ctx.restore();
+    }
+}
+
+/**
+ * Magnetizer Module
+ * Imbues passing particles with magnetic stickiness.
+ */
+class MagnetizerModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 80) {
+        super(id, x, y, width, height, 'MAGNETIZER');
+        this.radius = Math.min(width, height) / 2;
+        this.activeParticles = new Set();
+    }
+
+    affectParticle(particle, dt) {
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+        const inZone = distSq <= (this.radius * 0.7) ** 2;
+
+        if (inZone) {
+            if (!this.activeParticles.has(particle)) {
+                particle.isMagnetic = true;
+                this.activeParticles.add(particle);
+            }
+        } else {
+            this.activeParticles.delete(particle);
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        ctx.save();
+        ctx.strokeStyle = '#e040fb';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#e040fb';
+        ctx.lineWidth = 1.5;
+
+        // Horseshoe magnet ring symbol
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.font = 'bold 12px monospace';
+        ctx.fillStyle = '#e040fb';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('MAG', c.x, c.y);
+
+        ctx.font = '9px monospace';
+        ctx.fillText('MAGNETIZER', this.x + 8, this.y + 12);
+        ctx.restore();
+    }
+}
+
+/**
+ * Rigid Compound Magnetic Cluster
+ * Holds attached particle nodes with rigid local offsets.
+ */
+class MagneticCluster {
+    constructor(p1, p2) {
+        this.dead = false;
+        this.x = (p1.x + p2.x) / 2;
+        this.y = (p1.y + p2.y) / 2;
+        this.vx = (p1.vx + p2.vx) / 2;
+        this.vy = (p1.vy + p2.vy) / 2;
+
+        this.nodes = [];
+        this.addParticleNode(p1);
+        this.addParticleNode(p2);
+    }
+
+    addParticleNode(particle) {
+        particle.cluster = this;
+        this.nodes.push({
+            relX: particle.x - this.x,
+            relY: particle.y - this.y,
+            particle: particle
+        });
+    }
+
+    mergeCluster(otherCluster) {
+        otherCluster.nodes.forEach(node => {
+            node.particle.cluster = this;
+            node.relX = node.particle.x - this.x;
+            node.relY = node.particle.y - this.y;
+            this.nodes.push(node);
+        });
+
+        // Recalculate combined center of momentum
+        const totalNodes = this.nodes.length;
+        this.vx = (this.vx * (totalNodes - otherCluster.nodes.length) + otherCluster.vx * otherCluster.nodes.length) / totalNodes;
+        this.vy = (this.vy * (totalNodes - otherCluster.nodes.length) + otherCluster.vy * otherCluster.nodes.length) / totalNodes;
+
+        otherCluster.dead = true;
+    }
+
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        // Sync individual particle positions to the cluster center offset
+        this.nodes.forEach(node => {
+            const p = node.particle;
+            p.x = this.x + node.relX;
+            p.y = this.y + node.relY;
+            p.vx = this.vx;
+            p.vy = this.vy;
+        });
+    }
+
+    shatter(arena, impactVx = 0, impactVy = 0) {
+        this.dead = true;
+
+        this.nodes.forEach(node => {
+            const p = node.particle;
+            p.cluster = null;
+            p.isMagnetic = false; // Magnetism dissipates on impact shatter
+
+            const burstAngle = Math.atan2(node.relY, node.relX);
+            const explodeSpeed = 80 + Math.random() * 40;
+
+            p.vx = this.vx + impactVx * 0.2 + Math.cos(burstAngle) * explodeSpeed;
+            p.vy = this.vy + impactVy * 0.2 + Math.sin(burstAngle) * explodeSpeed;
+        });
+
+        if (arena && arena.effects) {
+            arena.effects.push(new ExplosionFlash(this.x, this.y, 30, '#e040fb'));
+        }
     }
 }

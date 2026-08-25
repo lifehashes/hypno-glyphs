@@ -272,6 +272,14 @@
                     </svg>
                     <span>BRICKS</span>
                 </div>
+                <!-- MAGNETIZER -->
+                <div class="palette-card" draggable="true" data-type="MAGNETIZER">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#e040fb" stroke-width="1.5" fill="none"/>
+                        <path d="M12 10 V18 M20 10 V18 M12 18 C12 22 20 22 20 18" stroke="#e040fb" stroke-width="2" fill="none"/>
+                    </svg>
+                    <span>MAGNETIZER</span>
+                </div>
             </div>
         </div>
 
@@ -683,6 +691,8 @@
                 // 0 = Breaks on any touch
                 // 150 = Requires boosted/high momentum particles to break
                 return new BricksModule(id, x, y, width, height, 0);
+            case 'MAGNETIZER':
+                return new MagnetizerModule(id, x, y, width, height);
             default:
                 return null;
         }
