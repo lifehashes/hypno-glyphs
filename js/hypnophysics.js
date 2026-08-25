@@ -1108,3 +1108,119 @@ class KineticConverterModule extends ArenaModule {
         ctx.restore();
     }
 }
+
+/**
+ * Destructible Bricks Shield Module
+ * Contains a 5x5 grid of solid dark grey cubes that fill the module area.
+ * Individual cubes break and disappear when hit by a particle.
+ */
+class BricksModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 80, threshold = 0) {
+        super(id, x, y, width, height, 'BRICKS');
+        this.gridSize = 5; // 5x5 grid of cubes
+        this.threshold = threshold; // Minimum momentum needed to break a cube
+        
+        // Initialize 5x5 grid of intact cube objects
+        this.cubes = [];
+        const cellW = this.width / this.gridSize;
+        const cellH = this.height / this.gridSize;
+
+        for (let r = 0; r < this.gridSize; r++) {
+            for (let c = 0; c < this.gridSize; c++) {
+                this.cubes.push({
+                    row: r,
+                    col: c,
+                    x: this.x + c * cellW,
+                    y: this.y + r * cellH,
+                    w: cellW,
+                    h: cellH,
+                    intact: true
+                });
+            }
+        }
+    }
+
+    // Keep individual cube positions updated if module is moved around during Edit Mode
+    update(dt) {
+        const cellW = this.width / this.gridSize;
+        const cellH = this.height / this.gridSize;
+        this.cubes.forEach(cube => {
+            cube.w = cellW;
+            cube.h = cellH;
+            cube.x = this.x + cube.col * cellW;
+            cube.y = this.y + cube.row * cellH;
+        });
+    }
+
+    affectParticle(particle, dt, arena) {
+        if (particle.dead) return;
+
+        for (let cube of this.cubes) {
+            if (!cube.intact) continue;
+
+            // Check AABB collision between particle point and cube bounding box
+            if (particle.x >= cube.x && particle.x <= cube.x + cube.w &&
+                particle.y >= cube.y && particle.y <= cube.y + cube.h) {
+
+                // Calculate momentum (assuming particle mass = 1)
+                const speed = Math.sqrt(particle.vx * particle.vx + particle.vy * particle.vy);
+                const momentum = speed;
+
+                if (momentum >= this.threshold) {
+                    // Shatter cube
+                    cube.intact = false;
+
+                    // Spawn small debris shatter flash effect
+                    if (arena && arena.effects) {
+                        const centerX = cube.x + cube.w / 2;
+                        const centerY = cube.y + cube.h / 2;
+                        arena.effects.push(new ExplosionFlash(centerX, centerY, 15, '#555555'));
+                    }
+                }
+
+                // Bounce particle back off the cube hit surface
+                const distToLeft = Math.abs(particle.x - cube.x);
+                const distToRight = Math.abs(particle.x - (cube.x + cube.w));
+                const distToTop = Math.abs(particle.y - cube.y);
+                const distToBottom = Math.abs(particle.y - (cube.y + cube.h));
+
+                const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
+
+                if (minDist === distToLeft || minDist === distToRight) {
+                    particle.vx *= -1;
+                } else {
+                    particle.vy *= -1;
+                }
+
+                break;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+
+        // Render intact dark grey cubes
+        this.cubes.forEach(cube => {
+            if (!cube.intact) return;
+
+            ctx.fillStyle = '#2a2d32';
+            ctx.strokeStyle = '#141619';
+            ctx.lineWidth = 1;
+
+            ctx.fillRect(cube.x + 1, cube.y + 1, cube.w - 2, cube.h - 2);
+            ctx.strokeRect(cube.x + 1, cube.y + 1, cube.w - 2, cube.h - 2);
+
+            // Subtle bevel highlight on top edge
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.fillRect(cube.x + 1, cube.y + 1, cube.w - 2, 2);
+        });
+
+        // Overlay Label
+        ctx.font = '9px monospace';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillText('BRICKS', this.x + 4, this.y + 12);
+        ctx.restore();
+    }
+}

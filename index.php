@@ -245,7 +245,7 @@
                 <div class="palette-card" draggable="true" data-type="KINETIC_BOOST">
                     <svg viewBox="0 0 32 32">
                         <circle cx="16" cy="16" r="11" stroke="#ff9900" stroke-width="1.5" fill="none"/>
-                        <path d="M10 18 L16 12 L22 18" stroke="#ff9900" stroke-width="2" fill="none"/>
+                        <path d="M10 14 L16 20 L22 14" stroke="#ff9900" stroke-width="2" fill="none"/>
                     </svg>
                     <span>BOOST 2X</span>
                 </div>
@@ -253,9 +253,24 @@
                 <div class="palette-card" draggable="true" data-type="KINETIC_SLOW">
                     <svg viewBox="0 0 32 32">
                         <circle cx="16" cy="16" r="11" stroke="#00bfff" stroke-width="1.5" fill="none"/>
-                        <path d="M10 14 L16 20 L22 14" stroke="#00bfff" stroke-width="2" fill="none"/>
+                        <path d="M10 18 L16 12 L22 18" stroke="#00bfff" stroke-width="2" fill="none"/>
                     </svg>
                     <span>SLOW 0.5X</span>
+                </div>
+                <!-- BRICKS SHIELD -->
+                <div class="palette-card" draggable="true" data-type="BRICKS">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="5" y="5" width="6" height="6" fill="#4a5568"/>
+                        <rect x="13" y="5" width="6" height="6" fill="#4a5568"/>
+                        <rect x="21" y="5" width="6" height="6" fill="#4a5568"/>
+                        <rect x="5" y="13" width="6" height="6" fill="#4a5568"/>
+                        <rect x="13" y="13" width="6" height="6" fill="#4a5568"/>
+                        <rect x="21" y="13" width="6" height="6" fill="#4a5568"/>
+                        <rect x="5" y="21" width="6" height="6" fill="#4a5568"/>
+                        <rect x="13" y="21" width="6" height="6" fill="#4a5568"/>
+                        <rect x="21" y="21" width="6" height="6" fill="#4a5568"/>
+                    </svg>
+                    <span>BRICKS</span>
                 </div>
             </div>
         </div>
@@ -663,6 +678,11 @@
                 return new KineticConverterModule(id, x, y, width, height, 'double');
             case 'KINETIC_SLOW':
                 return new KineticConverterModule(id, x, y, width, height, 'half');
+            case 'BRICKS':
+                // Change threshold parameter (last argument):
+                // 0 = Breaks on any touch
+                // 150 = Requires boosted/high momentum particles to break
+                return new BricksModule(id, x, y, width, height, 0);
             default:
                 return null;
         }
