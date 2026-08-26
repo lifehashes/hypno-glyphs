@@ -341,7 +341,8 @@
     </div>
 
     <div class="controls-bar">
-        <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">ENGAGE ENGINE</button>
+        <button class="help-btn" onclick="clearArena()">&lt;|</button>
+        <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">|&gt;</button>
         <button class="help-btn" id="edit-mode-btn" onclick="toggleEditMode()">EDIT MODE: OFF</button>
         <button class="help-btn" id="global-gravity-btn" onclick="toggleGlobalGravity()">GRAVITY DOWN: OFF</button>
         
@@ -360,9 +361,7 @@
         </div>
 
         <!-- Boundary Mode Selector Button -->
-        <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>
-
-        <button class="help-btn" onclick="clearArena()">CLEAR ARENA</button>
+        <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>        
     </div>
 </div>
 
@@ -525,14 +524,21 @@
     function toggleSimulation() {
         isRunning = !isRunning;
         const btn = document.getElementById('sim-btn');
-        btn.innerText = isRunning ? "HALT ENGINE" : "ENGAGE ENGINE";
+        btn.innerText = isRunning ? "||" : "|>";
         btn.classList.toggle('pulse-green', !isRunning);
     }
 
     function clearArena() {
+        // 1. Reset particles and arena scores
         arena.particles = [];
         scores.alphaScore = 0;
         scores.betaScore = 0;
+
+        // 2. Reset GOL engines to starting configuration
+        alphaEngine.resetToInitial();
+        betaEngine.resetToInitial();
+
+        // 3. Update interface state
         updateHUD();
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);

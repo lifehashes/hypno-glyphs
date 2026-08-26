@@ -40,7 +40,13 @@ class LifeEngine {
         return Array.from({ length: this.n }, () => Array(this.n).fill(0));
     }
 
+    resetToInitial() {
+        if (!this.initialBinary) return;
+        this.loadFromBinary(this.initialBinary, this.maxGenerations);
+    }
+
     loadFromBinary(binaryString, maxGen = 500) {
+        this.initialBinary = binaryString;
         this.iteration = 0;
         this.maxGenerations = maxGen;
         this.history.clear();
