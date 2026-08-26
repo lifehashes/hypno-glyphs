@@ -194,3 +194,163 @@ html, body {
 ::-webkit-scrollbar-track { background: #000; border-left: 1px solid rgba(255, 255, 255, 0.1); }
 ::-webkit-scrollbar-thumb { background: #222; border: 1px solid rgba(66, 244, 133, 0.2); }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent-green); }
+
+/* Frosted Glass Floating Game Over Scorecard */
+.game-over-modal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, 150%); /* Starts offscreen below */
+    width: 82%;
+    max-width: 620px;
+    background: rgba(10, 15, 25, 0.65);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 255, 255, 0.15);
+    z-index: 100;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+}
+
+.game-over-modal.active {
+    transform: translate(-50%, -50%); /* Smooth float up into center */
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.scorecard-header {
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #00ffff;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+}
+
+.scorecard-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+}
+
+.scorecard-card {
+    flex: 1;
+    background: rgba(5, 10, 20, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.scorecard-card.winner {
+    border-color: #42f485;
+    box-shadow: 0 0 15px rgba(66, 244, 133, 0.3);
+}
+
+.card-winner-badge {
+    display: none;
+    position: absolute;
+    top: -10px;
+    background: #42f485;
+    color: #000;
+    font-family: monospace;
+    font-size: 9px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+}
+
+.scorecard-card.winner .card-winner-badge {
+    display: block;
+}
+
+.card-title {
+    font-family: monospace;
+    font-size: 10px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.card-preview {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    background: #000;
+    margin-bottom: 8px;
+}
+
+.card-info {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    font-family: monospace;
+    font-size: 10px;
+    margin-top: 3px;
+}
+
+.info-label { color: #666; }
+.info-val { color: #fff; font-weight: bold; }
+
+.card-score-box {
+    margin-top: 10px;
+    width: 100%;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 0;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.score-label {
+    font-family: monospace;
+    font-size: 9px;
+    color: #aaa;
+}
+
+.score-value {
+    font-family: monospace;
+    font-size: 20px;
+    font-weight: bold;
+    color: #00ffff;
+}
+
+.vs-divider {
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: bold;
+    color: #ff3366;
+    text-shadow: 0 0 6px rgba(255, 51, 102, 0.6);
+}
+
+.scorecard-dismiss-btn {
+    background: rgba(0, 255, 255, 0.15);
+    border: 1px solid #00ffff;
+    color: #00ffff;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.scorecard-dismiss-btn:hover {
+    background: #00ffff;
+    color: #000;
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.6);
+}

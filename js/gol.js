@@ -24,6 +24,11 @@ class LifeEngine {
         this.resize();
     }
 
+    // Add getter for engine status
+    get isHalted() {
+        return !this.isActive;
+    }
+
     resize() {
         const parent = this.canvas.parentElement;
         const size = parent ? parent.clientWidth : 256;

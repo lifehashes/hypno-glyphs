@@ -340,6 +340,64 @@
                     display: none;
                 ">00:00</div>
             <canvas id="physics-canvas"></canvas>
+
+            <!-- GAME OVER SCORECARD OVERLAY -->
+            <div id="game-over-overlay" class="game-over-modal">
+                <div class="scorecard-header">MATCH TERMINATED // RESULTS</div>
+                
+                <div class="scorecard-body">
+                    <!-- ALPHA GLYPH COLUMN -->
+                    <div class="scorecard-card" id="card-alpha">
+                        <div class="card-winner-badge" id="badge-alpha">WINNER</div>
+                        <div class="card-title">SOURCE :: ALPHA</div>
+                        <canvas id="scorecard-alpha-preview" width="64" height="64" class="card-preview"></canvas>
+                        <div class="card-info">
+                            <span class="info-label">DESIGNATION</span>
+                            <span class="info-val" id="scorecard-alpha-name">-</span>
+                        </div>
+                        <div class="card-info">
+                            <span class="info-label">OWNER</span>
+                            <span class="info-val" id="scorecard-alpha-owner">-</span>
+                        </div>
+                        <div class="card-info">
+                            <span class="info-label">GENERATIONS</span>
+                            <span class="info-val" id="scorecard-alpha-gen">-</span>
+                        </div>
+                        <div class="card-score-box">
+                            <div class="score-label">FINAL SCORE</div>
+                            <div class="score-value" id="scorecard-alpha-score">0</div>
+                        </div>
+                    </div>
+
+                    <div class="vs-divider">VS</div>
+
+                    <!-- BETA GLYPH COLUMN -->
+                    <div class="scorecard-card" id="card-beta">
+                        <div class="card-winner-badge" id="badge-beta">WINNER</div>
+                        <div class="card-title">SOURCE :: BETA</div>
+                        <canvas id="scorecard-beta-preview" width="64" height="64" class="card-preview"></canvas>
+                        <div class="card-info">
+                            <span class="info-label">DESIGNATION</span>
+                            <span class="info-val" id="scorecard-beta-name">-</span>
+                        </div>
+                        <div class="card-info">
+                            <span class="info-label">OWNER</span>
+                            <span class="info-val" id="scorecard-beta-owner">-</span>
+                        </div>
+                        <div class="card-info">
+                            <span class="info-label">GENERATIONS</span>
+                            <span class="info-val" id="scorecard-beta-gen">-</span>
+                        </div>
+                        <div class="card-score-box">
+                            <div class="score-label">FINAL SCORE</div>
+                            <div class="score-value" id="scorecard-beta-score">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="scorecard-dismiss-btn" onclick="dismissGameOver()">CONTINUE</button>
+            </div>
+
         </div>
 
         <!-- SOURCE MODULE BETA -->
@@ -585,12 +643,31 @@
     let frameCount = 0;
     let lastFpsUpdate = performance.now();
 
+    function checkTerminationConditions() {
+        if (!isRunning) return false;
+
+        // Check if both LifeEngines have reached static/cyclic halting state or max gens
+        const alphaHalted = alphaEngine.isHalted || !alphaEngine.isActive || alphaEngine.iteration >= alphaEngine.maxGenerations;
+        const betaHalted  = betaEngine.isHalted  || !betaEngine.isActive  || betaEngine.iteration >= betaEngine.maxGenerations;
+
+        // Check if all particles have cleared the arena
+        const noParticles = arena.particles.length === 0;
+
+        return alphaHalted && betaHalted && noParticles;
+    }
+
     function loop() {
         if (isRunning) {
             arena.updateAndRender();
             alphaEngine.render();
             betaEngine.render();
             updateHUD();
+
+            // Check for Game Over condition match
+            if (checkTerminationConditions()) {
+                triggerGameOver();
+                return;
+            }
 
             // MATCH TIMER TICK LOGIC
             if (matchTimeRemaining > 0 && !timerExpired) {
@@ -1328,6 +1405,64 @@
             arena.boundaryMode = 'none';
             document.getElementById('boundary-btn').innerText = 'BOUNDARIES: NONE';
         }
+    }
+
+    // Triggers the Game Over Scorecard overlay
+    function triggerGameOver() {
+        isRunning = false;
+        const btn = document.getElementById('sim-btn');
+        if (btn) {
+            btn.innerText = "|>";
+            btn.classList.add('pulse-green');
+        }
+
+        // Copy live preview canvases to scorecard canvases
+        const srcAlphaCvs = document.getElementById('glyph-alpha-canvas');
+        const srcBetaCvs  = document.getElementById('glyph-beta-canvas');
+        
+        const dstAlphaCvs = document.getElementById('scorecard-alpha-preview');
+        const dstBetaCvs  = document.getElementById('scorecard-beta-preview');
+
+        dstAlphaCvs.getContext('2d').drawImage(srcAlphaCvs, 0, 0, 64, 64);
+        dstBetaCvs.getContext('2d').drawImage(srcBetaCvs, 0, 0, 64, 64);
+
+        // Populate designations, owners, generations & scores
+        document.getElementById('scorecard-alpha-name').innerText  = document.getElementById('alpha-name').innerText;
+        document.getElementById('scorecard-alpha-owner').innerText = document.getElementById('alpha-owner').innerText;
+        document.getElementById('scorecard-alpha-gen').innerText   = document.getElementById('alpha-gen').innerText;
+        document.getElementById('scorecard-alpha-score').innerText = scores.alphaScore;
+
+        document.getElementById('scorecard-beta-name').innerText  = document.getElementById('beta-name').innerText;
+        document.getElementById('scorecard-beta-owner').innerText = document.getElementById('beta-owner').innerText;
+        document.getElementById('scorecard-beta-gen').innerText   = document.getElementById('beta-gen').innerText;
+        document.getElementById('scorecard-beta-score').innerText = scores.betaScore;
+
+        // Apply color accents from intrinsic colors
+        const cardAlpha = document.getElementById('card-alpha');
+        const cardBeta  = document.getElementById('card-beta');
+        
+        cardAlpha.style.borderColor = alphaEngine.intrinsicColor;
+        cardBeta.style.borderColor  = betaEngine.intrinsicColor;
+
+        // Determine Winner: Standard score or lower negative wins
+        cardAlpha.classList.remove('winner');
+        cardBeta.classList.remove('winner');
+
+        if (scores.alphaScore !== scores.betaScore) {
+            // Higher score wins (including less negative, e.g., -5 wins against -20)
+            if (scores.alphaScore > scores.betaScore) {
+                cardAlpha.classList.add('winner');
+            } else {
+                cardBeta.classList.add('winner');
+            }
+        }
+
+        // Float overlay up
+        document.getElementById('game-over-overlay').classList.add('active');
+    }
+
+    function dismissGameOver() {
+        document.getElementById('game-over-overlay').classList.remove('active');
     }
 
 </script>
