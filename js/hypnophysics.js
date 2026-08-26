@@ -692,7 +692,7 @@ class ArenaManager {
 }
 
 /**
- * Sink / Drain Module (Destroys particles & increments/decrements score based on charge magnitude)
+ * Sink / Drain Module (Destroys particles & increments/decrements score based on charge magnitude and particle age)
  */
 class SinkModule extends ArenaModule {
     constructor(id, x, y, width = 80, height = 80, scoreTracker) {
@@ -714,14 +714,22 @@ class SinkModule extends ArenaModule {
         if (distSq <= (this.radius * 0.8) ** 2) {
             particle.dead = true;
 
+            // 1. Calculate Charge Multiplier
             const chargeMagnitude = Math.abs(particle.chargeVal);
-            const scoreMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
-            const delta = (particle.isAnti ? -1 : 1) * scoreMultiplier;
+            const chargeMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
 
+            // 2. Calculate Age Multiplier (1 Shake = 10s, minimum multiplier of 1)
+            const ageMultiplier = Math.max(1, particle.ageShakes);
+
+            // 3. Compute Net Point Value
+            // Matter gives + (Charge * Age), Anti-Matter gives - (Charge * Age)
+            const pointValue = (particle.isAnti ? -1 : 1) * chargeMultiplier * ageMultiplier;
+
+            // 4. Credit / Debit the appropriate source score
             if (particle.sourceId && particle.sourceId.includes('alpha')) {
-                this.scoreTracker.alphaScore += delta;
+                this.scoreTracker.alphaScore += pointValue;
             } else if (particle.sourceId && particle.sourceId.includes('beta')) {
-                this.scoreTracker.betaScore += delta;
+                this.scoreTracker.betaScore += pointValue;
             }
         }
     }
