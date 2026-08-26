@@ -125,6 +125,9 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Added transition and dynamic glow effects */
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 0 12px rgba(66, 244, 133, 0.35);
 }
 
 .glyph-preview canvas {

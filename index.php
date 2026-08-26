@@ -539,10 +539,10 @@
             document.getElementById('beta-owner').innerText = 'SYSTEM';
         }
 
-        document.getElementById('alpha-color').style.color = alphaEngine.intrinsicColor;
+        updateGlyphColorStyling('alpha', alphaEngine.intrinsicColor);
         document.getElementById('alpha-color').innerText   = alphaEngine.intrinsicColor.toUpperCase();
 
-        document.getElementById('beta-color').style.color  = betaEngine.intrinsicColor;
+        updateGlyphColorStyling('beta', betaEngine.intrinsicColor);
         document.getElementById('beta-color').innerText    = betaEngine.intrinsicColor.toUpperCase();
 
         const modWidth = 80;
@@ -738,7 +738,7 @@
 
         document.getElementById(`${prefix}-name`).innerText = `RAND_${Math.floor(Math.random() * 8999 + 1000)}`;
         document.getElementById(`${prefix}-owner`).innerText = 'PROCEDURAL';
-        document.getElementById(`${prefix}-color`).style.color = targetEngine.intrinsicColor;
+        updateGlyphColorStyling(source, targetEngine.intrinsicColor);
         document.getElementById(`${prefix}-color`).innerText   = targetEngine.intrinsicColor.toUpperCase();
 
         targetEngine.render();
@@ -759,7 +759,7 @@
 
         document.getElementById(`${prefix}-name`).innerText = randomDbGlyph.BATTLE_NAME;
         document.getElementById(`${prefix}-owner`).innerText = randomDbGlyph.OWNER || 'SYSTEM';
-        document.getElementById(`${prefix}-color`).style.color = targetEngine.intrinsicColor;
+        updateGlyphColorStyling(source, targetEngine.intrinsicColor);
         document.getElementById(`${prefix}-color`).innerText   = targetEngine.intrinsicColor.toUpperCase();
 
         targetEngine.render();
@@ -1463,6 +1463,24 @@
 
     function dismissGameOver() {
         document.getElementById('game-over-overlay').classList.remove('active');
+    }
+
+    function updateGlyphColorStyling(source, color) {
+        const prefix = source === 'alpha' ? 'alpha' : 'beta';
+        
+        // Update color text readout
+        const colorElem = document.getElementById(`${prefix}-color`);
+        if (colorElem) {
+            colorElem.style.color = color;
+            colorElem.innerText = color.toUpperCase();
+        }
+
+        // Update canvas preview container border & glow box-shadow
+        const previewContainer = document.querySelector(`#${prefix}-panel .glyph-preview`);
+        if (previewContainer) {
+            previewContainer.style.borderColor = color;
+            previewContainer.style.boxShadow = `0 0 14px ${color}80, inset 0 0 6px ${color}40`;
+        }
     }
 
 </script>
