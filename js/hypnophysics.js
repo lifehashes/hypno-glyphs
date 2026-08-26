@@ -633,6 +633,27 @@ class ArenaManager {
         }
         ctx.stroke();
 
+        // =========================================================
+        // 3. NEW: Extra Thick & Brighter Central Axis Crosshairs
+        // =========================================================
+        const midX = Math.round(w / 2) + 0.5;
+        const midY = Math.round(h / 2) + 0.5;
+
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.45)'; // Brighter cyan opacity
+        ctx.lineWidth = 3.5;                         // Extra thick line width
+        ctx.shadowBlur = 8;                          // Glowing neon effect
+        ctx.shadowColor = 'rgba(0, 255, 255, 0.6)';
+
+        ctx.beginPath();
+        // Vertical center line
+        ctx.moveTo(midX, 0);
+        ctx.lineTo(midX, h);
+
+        // Horizontal center line
+        ctx.moveTo(0, midY);
+        ctx.lineTo(w, midY);
+        ctx.stroke();
+
         ctx.restore();
     }
 

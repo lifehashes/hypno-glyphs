@@ -118,7 +118,7 @@
 
 <div class="outer-frame">
     <div class="terminal-header">
-        <div class="terminal-title">HYPNOGLYPHS // B3/S23-PHYSICS ENGINE v0.1</div>
+        <div class="stat-line">HYPNOGLYPHS // B3/S23-PHYSICS ENGINE v0.1</div>
         <div class="stat-line" style="border:none; gap:15px;">
             <span>STATUS: <span style="color:var(--accent-green)">ONLINE</span></span>
             <span>FPS: <span id="fps-counter" class="stat-value">60</span></span>
@@ -916,41 +916,50 @@
     metricResizeObserver.observe(scoreCanvas.parentElement);
     resizeMetricBars();
 
-    // 3. Render function for center-expanding proportional bars
+    // 3. Render function for center-expanding proportional bars with mid-point markers
     function renderMetricBar(ctx, width, height, valAlpha, valBeta, colorAlpha, colorBeta) {
         ctx.clearRect(0, 0, width, height);
 
         const totalVal = valAlpha + valBeta;
-        if (totalVal <= 0) return; // Silent empty state when both values are 0
+        
+        // Always draw subtle background mid-point tick line (1px wide)
+        const midX = Math.floor(width / 2);
 
-        // Determine proportions
-        const ratioAlpha = valAlpha / totalVal;
-        const ratioBeta = valBeta / totalVal;
+        if (totalVal > 0) {
+            // Determine proportions
+            const ratioAlpha = valAlpha / totalVal;
+            const ratioBeta = valBeta / totalVal;
 
-        let barWidth = width;
+            let barWidth = width;
 
-        // Scale outward from the center if below threshold (1000)
-        if (totalVal < 1000) {
-            barWidth = (totalVal / 1000) * width;
+            // Scale outward from the center if below threshold (1000)
+            if (totalVal < 1000) {
+                barWidth = (totalVal / 1000) * width;
+            }
+
+            const alphaWidth = barWidth * ratioAlpha;
+            const betaWidth = barWidth * ratioBeta;
+
+            // Center alignment offsets
+            const startX = (width - barWidth) / 2;
+
+            // Render Left/Alpha Segment
+            if (alphaWidth > 0) {
+                ctx.fillStyle = colorAlpha;
+                ctx.fillRect(startX, 0, alphaWidth, height);
+            }
+
+            // Render Right/Beta Segment
+            if (betaWidth > 0) {
+                ctx.fillStyle = colorBeta;
+                ctx.fillRect(startX + alphaWidth, 0, betaWidth, height);
+            }
         }
 
-        const alphaWidth = barWidth * ratioAlpha;
-        const betaWidth = barWidth * ratioBeta;
-
-        // Center alignment offsets
-        const startX = (width - barWidth) / 2;
-
-        // Render Left/Alpha Segment
-        if (alphaWidth > 0) {
-            ctx.fillStyle = colorAlpha;
-            ctx.fillRect(startX, 0, alphaWidth, height);
-        }
-
-        // Render Right/Beta Segment
-        if (betaWidth > 0) {
-            ctx.fillStyle = colorBeta;
-            ctx.fillRect(startX + alphaWidth, 0, betaWidth, height);
-        }
+        // Render Mid-Point Indicator Notch
+        // Uses a semi-transparent high-contrast line to stand out against colored or dark backgrounds
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.fillRect(midX, 0, 1, height);
     }
 
     // 4. Update HUD Loop Integration
