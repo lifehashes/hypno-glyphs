@@ -225,7 +225,8 @@ class SourceSpawnModule extends ArenaModule {
 
         ctx.font = '9px monospace';
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fillText(this.label, this.x + 4, this.y + 12);
+        ctx.textAlign = 'center';
+        ctx.fillText(this.label, c.x, this.y + 12);
         ctx.restore();
     }
 }
@@ -715,7 +716,8 @@ class SinkModule extends ArenaModule {
 
         ctx.font = '9px monospace';
         ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
-        ctx.fillText('DRAIN SINK', this.x + 8, this.y + 12);
+        ctx.textAlign = 'center';
+        ctx.fillText('DRAIN SINK', c.x, this.y + 12);
         ctx.restore();
     }
 }
@@ -773,7 +775,8 @@ class QCDInverterModule extends ArenaModule {
 
         ctx.font = '9px monospace';
         ctx.fillStyle = '#ff00ff';
-        ctx.fillText('QCD INVERTER', this.x + 2, this.y + 12);
+        ctx.textAlign = 'center';
+        ctx.fillText('QCD INVERTER', c.x, this.y + 12);
         ctx.restore();
     }
 }
@@ -909,7 +912,8 @@ class DoublerModule extends ArenaModule {
 
         ctx.font = '9px monospace';
         ctx.fillStyle = '#ffbb00';
-        ctx.fillText('DOUBLER', this.x + 16, this.y + 12);
+        ctx.textAlign = 'center';
+        ctx.fillText('DOUBLER', c.x, this.y + 12);
         ctx.restore();
     }
 }
@@ -970,7 +974,8 @@ class ChargerModule extends ArenaModule {
 
         ctx.font = '9px monospace';
         ctx.fillStyle = color;
-        ctx.fillText(isPos ? '+CHARGER' : '-CHARGER', this.x + (isPos ? 10 : 12), this.y + 12);
+        ctx.textAlign = 'center';
+        ctx.fillText(isPos ? '+CHARGER' : '-CHARGER', c.x, this.y + 12);
         ctx.restore();
     }
 }
@@ -1038,7 +1043,9 @@ class CapacitorModule extends ArenaModule {
         ctx.fillText(isPos ? '+' : '−', c.x, c.y);
 
         ctx.font = '9px monospace';
-        ctx.fillText('CAPACITOR', this.x + 8, this.y + 12);
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.fillText('CAPACITOR', c.x, this.y + 12);
         ctx.restore();
     }
 }
@@ -1096,7 +1103,7 @@ class KineticConverterModule extends ArenaModule {
         ctx.stroke();
 
         // Directional Chevron Arrows (Up for Fast, Down for Slow)
-        const offset = isDouble ? -3 : 3;
+        const offset = isDouble ? 3 : -3;
         ctx.beginPath();
         ctx.moveTo(c.x - 6, c.y + offset);
         ctx.lineTo(c.x, c.y - offset);
@@ -1200,11 +1207,21 @@ class BricksModule extends ArenaModule {
 
     draw(ctx) {
         super.draw(ctx);
+        const c = this.center;
         ctx.save();
+
+        const cellW = this.width / this.gridSize;
+        const cellH = this.height / this.gridSize;
 
         // Render intact dark grey cubes
         this.cubes.forEach(cube => {
             if (!cube.intact) return;
+
+            // Recalculate coordinates on render to guarantee edit-mode alignment
+            cube.w = cellW;
+            cube.h = cellH;
+            cube.x = this.x + cube.col * cellW;
+            cube.y = this.y + cube.row * cellH;
 
             ctx.fillStyle = '#2a2d32';
             ctx.strokeStyle = '#141619';
@@ -1221,7 +1238,8 @@ class BricksModule extends ArenaModule {
         // Overlay Label
         ctx.font = '9px monospace';
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.fillText('BRICKS', this.x + 4, this.y + 12);
+        ctx.textAlign = 'center';
+        ctx.fillText('BRICKS', c.x, this.y + 12);
         ctx.restore();
     }
 }
@@ -1275,7 +1293,9 @@ class MagnetizerModule extends ArenaModule {
         ctx.fillText('MAG', c.x, c.y);
 
         ctx.font = '9px monospace';
-        ctx.fillText('MAGNETIZER', this.x + 8, this.y + 12);
+        ctx.fillStyle = '#e040fb';
+        ctx.textAlign = 'center';
+        ctx.fillText('MAGNETIZER', c.x, this.y + 12);
         ctx.restore();
     }
 }

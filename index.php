@@ -72,6 +72,8 @@
         }
 
         .palette-card {
+            aspect-ratio: 1 / 1;
+            box-sizing: border-box;
             background: rgba(15, 20, 30, 0.7);
             border: 1px solid rgba(66, 244, 133, 0.2);
             border-radius: 4px;
@@ -233,27 +235,36 @@
                     </svg>
                     <span>- CHARGER</span>
                 </div>
-                <!-- CAPACITOR -->
-                <div class="palette-card" draggable="true" data-type="CAPACITOR">
+                <!-- CAPACITOR POS -->
+                <div class="palette-card" draggable="true" data-type="CAPACITOR_POS">
                     <svg viewBox="0 0 32 32">
                         <path d="M11 8 V24 M21 8 V24" stroke="#00e1ff" stroke-width="2"/>
                         <path d="M14 16 H18" stroke="#00e1ff" stroke-width="1.5"/>
                     </svg>
-                    <span>CAPACITOR</span>
+                    <span>+ CAPACITOR</span>
                 </div>
-                <!-- KINETIC BOOST -->
+                <!-- CAPACITOR NEG -->
+                <div class="palette-card" draggable="true" data-type="CAPACITOR_NEG">
+                    <svg viewBox="0 0 32 32">
+                        <path d="M11 8 V24 M21 8 V24" stroke="#ff3366" stroke-width="2"/>
+                        <path d="M14 16 H18" stroke="#ff3366" stroke-width="1.5"/>
+                    </svg>
+                    <span>- CAPACITOR</span>
+                </div>
+                <!-- KINETIC BOOST (Up Arrow) -->
                 <div class="palette-card" draggable="true" data-type="KINETIC_BOOST">
                     <svg viewBox="0 0 32 32">
                         <circle cx="16" cy="16" r="11" stroke="#ff9900" stroke-width="1.5" fill="none"/>
-                        <path d="M10 14 L16 20 L22 14" stroke="#ff9900" stroke-width="2" fill="none"/>
+                        <path d="M10 18 L16 12 L22 18" stroke="#ff9900" stroke-width="2" fill="none"/>
                     </svg>
                     <span>BOOST 2X</span>
                 </div>
-                <!-- KINETIC SLOW -->
+
+                <!-- KINETIC SLOW (Down Arrow) -->
                 <div class="palette-card" draggable="true" data-type="KINETIC_SLOW">
                     <svg viewBox="0 0 32 32">
                         <circle cx="16" cy="16" r="11" stroke="#00bfff" stroke-width="1.5" fill="none"/>
-                        <path d="M10 18 L16 12 L22 18" stroke="#00bfff" stroke-width="2" fill="none"/>
+                        <path d="M10 14 L16 20 L22 14" stroke="#00bfff" stroke-width="2" fill="none"/>
                     </svg>
                     <span>SLOW 0.5X</span>
                 </div>
@@ -680,8 +691,10 @@
                 return new ChargerModule(id, x, y, width, height, 1);
             case 'CHARGER_NEG':
                 return new ChargerModule(id, x, y, width, height, -1);
-            case 'CAPACITOR':
-                return new CapacitorModule(id, x, y, width, height, 2, currentCap);
+            case 'CAPACITOR_POS':
+                return new CapacitorModule(id, x, y, width, height, 4, currentCap);
+            case 'CAPACITOR_NEG':
+                return new CapacitorModule(id, x, y, width, height, -4, currentCap);
             case 'KINETIC_BOOST':
                 return new KineticConverterModule(id, x, y, width, height, 'double');
             case 'KINETIC_SLOW':
@@ -807,6 +820,14 @@
 
         selectedModule.x = newX;
         selectedModule.y = newY;
+
+        // Ensure sub-elements (like Bricks) update their internal positions immediately
+        selectedModule.update(0, arena);
+
+        // Re-render frame immediately if engine is paused
+        if (!isRunning) {
+            arena.renderOnly();
+        }
     });
 
     window.addEventListener('mouseup', () => {
