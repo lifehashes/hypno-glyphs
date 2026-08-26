@@ -172,6 +172,8 @@
                 <button class="load-btn" style="flex:1;" onclick="loadRandomSeed('alpha')">RANDOM SEED</button>
                 <button class="load-btn" style="flex:1; background:rgba(0, 255, 255, 0.15); border-color:#00ffff;" onclick="loadDatabaseGlyph('alpha')">DB DRAW</button>
             </div>
+            <!-- NEW: Graph Strip Canvas under buttons -->
+            <canvas id="alpha-graph-canvas" height="30" style="width: 100%; height: 30px; display: block; margin-top: 6px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
         </div>
 
         <!-- MODULE PALETTE DRAWER (EDIT MODE) -->
@@ -345,6 +347,8 @@
                 <button class="load-btn" style="flex:1;" onclick="loadRandomSeed('beta')">RANDOM SEED</button>
                 <button class="load-btn" style="flex:1; background:rgba(0, 255, 255, 0.15); border-color:#00ffff;" onclick="loadDatabaseGlyph('beta')">DB DRAW</button>
             </div>
+            <!-- NEW: Graph Strip Canvas under buttons -->
+            <canvas id="beta-graph-canvas" height="30" style="width: 100%; height: 30px; display: block; margin-top: 6px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
         </div>
     </div>
 
@@ -503,6 +507,7 @@
         document.getElementById('beta-current-hash').innerText  = betaEngine.currentHash  || '-';
 
         updateMetricBars();
+        updateGraphStrips();
     }
 
     let frameCount = 0;
@@ -547,6 +552,10 @@
         // 2. Reset GOL engines to starting configuration
         alphaEngine.resetToInitial();
         betaEngine.resetToInitial();
+
+        // Reset histories
+        historyAlpha.length = 0;
+        historyBeta.length = 0;
 
         // 3. Update interface state
         updateHUD();
@@ -992,6 +1001,122 @@
             colorAlpha, 
             colorBeta
         );
+    }
+
+    // --- GRAPH HISTORIES AND RENDER ENGINE ---
+    const alphaGraphCanvas = document.getElementById('alpha-graph-canvas');
+    const betaGraphCanvas  = document.getElementById('beta-graph-canvas');
+    const alphaGraphCtx    = alphaGraphCanvas.getContext('2d');
+    const betaGraphCtx     = betaGraphCanvas.getContext('2d');
+
+    // Retain full historical lifecycle without fixed sliding limits
+    const historyAlpha = [];
+    const historyBeta  = [];
+
+    function resizeGraphStrips() {
+        const rectA = alphaGraphCanvas.getBoundingClientRect();
+        if (rectA.width > 0) alphaGraphCanvas.width = rectA.width;
+
+        const rectB = betaGraphCanvas.getBoundingClientRect();
+        if (rectB.width > 0) betaGraphCanvas.width = rectB.width;
+    }
+
+    const graphResizeObserver = new ResizeObserver(() => resizeGraphStrips());
+    graphResizeObserver.observe(alphaGraphCanvas.parentElement);
+    graphResizeObserver.observe(betaGraphCanvas.parentElement);
+    resizeGraphStrips();
+
+    function updateGraphStrips() {
+        // Compute active counts for particles vs anti-particles per module
+        const alphaP    = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha') && (p.charge >= 0 || p.charge === undefined)).length;
+        const alphaAnti = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha') && p.charge < 0).length;
+
+        const betaP    = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta') && (p.charge >= 0 || p.charge === undefined)).length;
+        const betaAnti = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta') && p.charge < 0).length;
+
+        historyAlpha.push({ particles: alphaP, antiParticles: alphaAnti });
+        historyBeta.push({ particles: betaP, antiParticles: betaAnti });
+
+        renderStripGraph(alphaGraphCtx, alphaGraphCanvas.width, 30, historyAlpha, alphaEngine.intrinsicColor, alphaEngine.maxGenerations);
+        renderStripGraph(betaGraphCtx, betaGraphCanvas.width, 30, historyBeta, betaEngine.intrinsicColor, betaEngine.maxGenerations);
+    }
+
+    function renderStripGraph(ctx, width, height, historyData, baseColor, maxGenerations) {
+        ctx.clearRect(0, 0, width, height);
+
+        // Subtle zero-line axis marker
+        const midY = height / 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, midY);
+        ctx.lineTo(width, midY);
+        ctx.stroke();
+
+        if (historyData.length < 2) return;
+
+        // Determine horizontal domain (targetMax)
+        let targetMax = maxGenerations;
+        if (targetMax === Infinity || !targetMax) {
+            // Initial window 500; scale dynamically if runtime exceeds 500
+            targetMax = Math.max(500, historyData.length);
+        }
+
+        const stepX = width / Math.max(1, targetMax - 1);
+
+        // Auto-scaling limit for Y-axis (particles vs anti-particles)
+        let maxP = 10;
+        let maxAnti = 10;
+        historyData.forEach(d => {
+            if (d.particles > maxP) maxP = d.particles;
+            if (d.antiParticles > maxAnti) maxAnti = d.antiParticles;
+        });
+
+        // 1. Solid Filled Upper Graph: Particles (Growing Upwards from midY)
+        ctx.fillStyle = baseColor;
+        ctx.globalAlpha = 0.45;
+        ctx.beginPath();
+        ctx.moveTo(0, midY);
+
+        for (let i = 0; i < historyData.length; i++) {
+            const x = i * stepX;
+            const valNorm = historyData[i].particles / maxP;
+            const y = midY - (valNorm * (midY - 2)); 
+            ctx.lineTo(x, y);
+        }
+
+        const lastX = (historyData.length - 1) * stepX;
+        ctx.lineTo(lastX, midY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+
+        // Solid top outline for upper curve
+        ctx.strokeStyle = baseColor;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i < historyData.length; i++) {
+            const x = i * stepX;
+            const valNorm = historyData[i].particles / maxP;
+            const y = midY - (valNorm * (midY - 2));
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // 2. Outline Graph Line: Anti-Particles (Growing Downwards from midY)
+        ctx.strokeStyle = '#ff3366';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+
+        for (let i = 0; i < historyData.length; i++) {
+            const x = i * stepX;
+            const valNorm = historyData[i].antiParticles / maxAnti;
+            const y = midY + (valNorm * (height - midY - 2)); 
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
     }
 
 </script>
