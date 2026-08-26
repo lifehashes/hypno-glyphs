@@ -145,6 +145,10 @@
                 <span class="stat-value" id="alpha-name">P_56_10</span>
             </div>
             <div class="stat-line">
+                <span>OWNER:</span>
+                <span class="stat-value" id="alpha-owner" style="color: #00ffff;">-</span>
+            </div>
+            <div class="stat-line">
                 <span>INTRINSIC HUE:</span>
                 <span class="stat-value" id="alpha-color" style="color: #42f485">#42F485</span>
             </div>
@@ -316,6 +320,25 @@
 
         <!-- MAIN ARENA CANVAS -->
         <div class="arena-container">
+            <div id="arena-timer" style="
+                    position: absolute;
+                    top: 12px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    font-family: monospace;
+                    font-size: 22px;
+                    font-weight: bold;
+                    color: #00ffff;
+                    background: rgba(10, 15, 25, 0.75);
+                    border: 1px solid rgba(0, 255, 255, 0.4);
+                    border-radius: 4px;
+                    padding: 4px 14px;
+                    letter-spacing: 2px;
+                    pointer-events: none;
+                    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+                    z-index: 10;
+                    display: none;
+                ">00:00</div>
             <canvas id="physics-canvas"></canvas>
         </div>
 
@@ -328,6 +351,10 @@
             <div class="stat-line">
                 <span>DESIGNATION:</span>
                 <span class="stat-value" id="beta-name">P_56_10</span>
+            </div>
+            <div class="stat-line">
+                <span>OWNER:</span>
+                <span class="stat-value" id="beta-owner" style="color: #00ffff;">-</span>
             </div>
             <div class="stat-line">
                 <span>INTRINSIC HUE:</span>
@@ -392,7 +419,24 @@
         </div>
 
         <!-- Boundary Mode Selector Button -->
-        <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>        
+        <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>
+
+        <!-- MATCH TIMEOUT & OVERTIME RESOLUTION SELECTORS -->
+        <div style="display:flex; align-items:center; gap:6px; color:#fff; font-family:monospace; font-size:11px; margin-left: 8px;">
+            <label for="timer-select">LIMIT:</label>
+            <select id="timer-select" onchange="resetMatchTimer()" style="background:#0f141e; color:#42f485; border:1px solid rgba(66,244,133,0.3); padding:3px 6px; font-family:monospace; font-size:11px; border-radius:3px; cursor:pointer;">
+                <option value="0">OFF</option>
+                <option value="300">5 MIN</option>
+                <option value="600">10 MIN</option>
+                <option value="900">15 MIN</option>
+            </select>
+            
+            <label for="action-select" style="margin-left:4px;">TRIGGER:</label>
+            <select id="action-select" style="background:#0f141e; color:#00ffff; border:1px solid rgba(0,255,255,0.3); padding:3px 6px; font-family:monospace; font-size:11px; border-radius:3px; cursor:pointer;">
+                <option value="GRAVITY">MAX GRAVITY</option>
+                <option value="GEOMETRY">NO BOUNDARIES</option>
+            </select>
+        </div>
     </div>
 </div>
 
@@ -400,6 +444,10 @@
     const databaseGlyphs = <?php echo json_encode($myGlyphs ?: []); ?>;
     const canvas = document.getElementById('physics-canvas');
     let isRunning = false;
+
+    let matchTimeRemaining = 0; // seconds remaining
+    let lastTimerTick = performance.now();
+    let timerExpired = false;
 
     const alphaEngine = new LifeEngine('glyph-alpha-canvas', 16);
     const betaEngine  = new LifeEngine('glyph-beta-canvas', 16);
@@ -417,16 +465,20 @@
             const alphaData = databaseGlyphs[0];
             alphaEngine.loadFromBinary(alphaData.BIN, parseInt(alphaData.GENERATIONS) || 500);
             document.getElementById('alpha-name').innerText = alphaData.BATTLE_NAME;
+            document.getElementById('alpha-owner').innerText = alphaData.OWNER || 'SYSTEM';
         } else {
             alphaEngine.loadFromBinary(getRandomBinary(256), 500);
+            document.getElementById('alpha-owner').innerText = 'SYSTEM';
         }
 
         if (databaseGlyphs.length > 1) {
             const betaData = databaseGlyphs[1];
             betaEngine.loadFromBinary(betaData.BIN, parseInt(betaData.GENERATIONS) || 500);
             document.getElementById('beta-name').innerText = betaData.BATTLE_NAME;
+            document.getElementById('beta-owner').innerText = betaData.OWNER || 'SYSTEM';
         } else {
             betaEngine.loadFromBinary(getRandomBinary(256), 500);
+            document.getElementById('beta-owner').innerText = 'SYSTEM';
         }
 
         document.getElementById('alpha-color').style.color = alphaEngine.intrinsicColor;
@@ -540,6 +592,21 @@
             betaEngine.render();
             updateHUD();
 
+            // MATCH TIMER TICK LOGIC
+            if (matchTimeRemaining > 0 && !timerExpired) {
+                const now = performance.now();
+                const deltaSecs = (now - lastTimerTick) / 1000;
+                matchTimeRemaining -= deltaSecs;
+
+                if (matchTimeRemaining <= 0) {
+                    matchTimeRemaining = 0;
+                    executeTimeUpAction();
+                } else {
+                    updateTimerDisplay();
+                }
+            }
+            lastTimerTick = performance.now();
+
             frameCount++;
             const now = performance.now();
             if (now - lastFpsUpdate >= 500) {
@@ -549,7 +616,7 @@
                 lastFpsUpdate = now;
             }
         } else {
-            // Render arena state while paused or editing
+            lastTimerTick = performance.now(); // Reset delta anchor when paused
             arena.renderOnly();
         }
         requestAnimationFrame(loop);
@@ -577,6 +644,8 @@
         historyAlpha.length = 0;
         historyBeta.length = 0;
 
+        resetMatchTimer();
+
         // 3. Update interface state
         updateHUD();
         const ctx = canvas.getContext('2d');
@@ -591,6 +660,7 @@
         targetEngine.loadFromBinary(randomBin, Infinity);
 
         document.getElementById(`${prefix}-name`).innerText = `RAND_${Math.floor(Math.random() * 8999 + 1000)}`;
+        document.getElementById(`${prefix}-owner`).innerText = 'PROCEDURAL';
         document.getElementById(`${prefix}-color`).style.color = targetEngine.intrinsicColor;
         document.getElementById(`${prefix}-color`).innerText   = targetEngine.intrinsicColor.toUpperCase();
 
@@ -611,6 +681,7 @@
         targetEngine.loadFromBinary(randomDbGlyph.BIN, parseInt(randomDbGlyph.GENERATIONS) || 500);
 
         document.getElementById(`${prefix}-name`).innerText = randomDbGlyph.BATTLE_NAME;
+        document.getElementById(`${prefix}-owner`).innerText = randomDbGlyph.OWNER || 'SYSTEM';
         document.getElementById(`${prefix}-color`).style.color = targetEngine.intrinsicColor;
         document.getElementById(`${prefix}-color`).innerText   = targetEngine.intrinsicColor.toUpperCase();
 
@@ -1215,6 +1286,48 @@
         renderDistributionHistogram('beta-speed-canvas', betaData.speedBins, betaEngine.intrinsicColor);
         renderDistributionHistogram('beta-charge-canvas', betaData.chargeBins, betaEngine.intrinsicColor);
         renderDistributionHistogram('beta-age-canvas', betaData.ageBins, betaEngine.intrinsicColor);
+    }
+
+    function resetMatchTimer() {
+        const timeVal = parseInt(document.getElementById('timer-select').value, 10);
+        matchTimeRemaining = timeVal;
+        timerExpired = false;
+        
+        const overlay = document.getElementById('arena-timer');
+        if (timeVal > 0) {
+            overlay.style.display = 'block';
+            updateTimerDisplay();
+        } else {
+            overlay.style.display = 'none';
+        }
+    }
+
+    function updateTimerDisplay() {
+        const overlay = document.getElementById('arena-timer');
+        const mins = Math.floor(matchTimeRemaining / 60);
+        const secs = Math.floor(matchTimeRemaining % 60);
+        overlay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function executeTimeUpAction() {
+        timerExpired = true;
+        const action = document.getElementById('action-select').value;
+        const timerDisplay = document.getElementById('arena-timer');
+        
+        timerDisplay.innerText = "TIME EXPIRED";
+        timerDisplay.style.color = "#ff3366";
+        timerDisplay.style.borderColor = "#ff3366";
+
+        if (action === 'GRAVITY') {
+            // Max gravity slider to +20,000,000
+            const gravitySlider = document.getElementById('gravity-slider');
+            gravitySlider.value = 20000000;
+            updateGravity(20000000);
+        } else if (action === 'GEOMETRY') {
+            // Force arena boundary mode to NONE
+            arena.boundaryMode = 'none';
+            document.getElementById('boundary-btn').innerText = 'BOUNDARIES: NONE';
+        }
     }
 
 </script>
