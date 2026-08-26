@@ -125,6 +125,14 @@
         </div>
     </div>
 
+    <!-- METRIC BARS CONTAINER -->
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px;">
+        <!-- Top Bar: Scores (4px high) -->
+        <canvas id="score-bar-canvas" height="4" style="width: 100%; display: block;"></canvas>
+        <!-- Bottom Bar: Particle Count (2px high) -->
+        <canvas id="particle-bar-canvas" height="2" style="width: 100%; display: block;"></canvas>
+    </div>
+
     <div class="duel-stage">
         <!-- SOURCE MODULE ALPHA (PLAY MODE) -->
         <div class="player-box" id="alpha-panel">
@@ -493,6 +501,8 @@
         document.getElementById('alpha-current-hash').innerText = alphaEngine.currentHash || '-';
         document.getElementById('beta-origin-hash').innerText   = betaEngine.originHash   || '-';
         document.getElementById('beta-current-hash').innerText  = betaEngine.currentHash  || '-';
+
+        updateMetricBars();
     }
 
     let frameCount = 0;
@@ -887,6 +897,93 @@
             }
         }
     });
+
+    // 1. References for the metric canvases
+    const scoreCanvas = document.getElementById('score-bar-canvas');
+    const particleCanvas = document.getElementById('particle-bar-canvas');
+    const scoreCtx = scoreCanvas.getContext('2d');
+    const particleCtx = particleCanvas.getContext('2d');
+
+    // 2. Keep metric canvas resolution crisp on resize
+    function resizeMetricBars() {
+        const rect = scoreCanvas.getBoundingClientRect();
+        scoreCanvas.width = rect.width;
+        particleCanvas.width = rect.width;
+    }
+
+    // Add metric bar resizing to the existing observer/resize routine
+    const metricResizeObserver = new ResizeObserver(() => resizeMetricBars());
+    metricResizeObserver.observe(scoreCanvas.parentElement);
+    resizeMetricBars();
+
+    // 3. Render function for center-expanding proportional bars
+    function renderMetricBar(ctx, width, height, valAlpha, valBeta, colorAlpha, colorBeta) {
+        ctx.clearRect(0, 0, width, height);
+
+        const totalVal = valAlpha + valBeta;
+        if (totalVal <= 0) return; // Silent empty state when both values are 0
+
+        // Determine proportions
+        const ratioAlpha = valAlpha / totalVal;
+        const ratioBeta = valBeta / totalVal;
+
+        let barWidth = width;
+
+        // Scale outward from the center if below threshold (1000)
+        if (totalVal < 1000) {
+            barWidth = (totalVal / 1000) * width;
+        }
+
+        const alphaWidth = barWidth * ratioAlpha;
+        const betaWidth = barWidth * ratioBeta;
+
+        // Center alignment offsets
+        const startX = (width - barWidth) / 2;
+
+        // Render Left/Alpha Segment
+        if (alphaWidth > 0) {
+            ctx.fillStyle = colorAlpha;
+            ctx.fillRect(startX, 0, alphaWidth, height);
+        }
+
+        // Render Right/Beta Segment
+        if (betaWidth > 0) {
+            ctx.fillStyle = colorBeta;
+            ctx.fillRect(startX + alphaWidth, 0, betaWidth, height);
+        }
+    }
+
+    // 4. Update HUD Loop Integration
+    // (Incorporate these calls into your existing updateHUD() function)
+    function updateMetricBars() {
+        const alphaCount = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha')).length;
+        const betaCount  = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta')).length;
+
+        const colorAlpha = alphaEngine.intrinsicColor;
+        const colorBeta  = betaEngine.intrinsicColor;
+
+        // Render Top Bar: Scores (4px)
+        renderMetricBar(
+            scoreCtx, 
+            scoreCanvas.width, 
+            4, 
+            Math.max(0, scores.alphaScore), 
+            Math.max(0, scores.betaScore), 
+            colorAlpha, 
+            colorBeta
+        );
+
+        // Render Bottom Bar: Particle Count (2px)
+        renderMetricBar(
+            particleCtx, 
+            particleCanvas.width, 
+            2, 
+            alphaCount, 
+            betaCount, 
+            colorAlpha, 
+            colorBeta
+        );
+    }
 
 </script>
 
