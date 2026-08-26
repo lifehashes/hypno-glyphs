@@ -17,6 +17,11 @@ class Particle {
         this.dead = false;
         this.isAnti = false;
         this.ringRotation = 0; // Rotation angle for animated shell spinning
+
+        // NEW: Age tracking in seconds and shakes
+        this.ageSeconds = 0;
+        this.ageShakes = 0; // 1 shake = 10 seconds
+
     }
 
     update(dt) {
@@ -24,6 +29,10 @@ class Particle {
         this.vy += this.ay * dt;
         this.x += this.vx * dt;
         this.y += this.vy * dt;
+
+        // Accumulate runtime age
+        this.ageSeconds += dt;
+        this.ageShakes = Math.floor(this.ageSeconds / 10); //
 
         this.ax = 0;
         this.ay = 0;

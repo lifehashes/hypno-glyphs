@@ -138,7 +138,7 @@
         <div class="player-box" id="alpha-panel">
             <div class="pane-title">SOURCE :: ALPHA</div>
             <div class="glyph-preview">
-                <canvas id="glyph-alpha-canvas" width="128" height="128"></canvas>
+                <canvas id="glyph-alpha-canvas" width="80" height="80"></canvas>
             </div>
             <div class="stat-line">
                 <span>DESIGNATION:</span>
@@ -174,6 +174,16 @@
             </div>
             <!-- NEW: Graph Strip Canvas under buttons -->
             <canvas id="alpha-graph-canvas" height="30" style="width: 100%; height: 30px; display: block; margin-top: 6px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
+
+            <div style="font-size: 9px; color: #888; margin-top: 6px;">SPEED DISTRIBUTION</div>
+            <canvas id="alpha-speed-canvas" height="24" style="width: 100%; height: 24px; display: block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
+
+            <div style="font-size: 9px; color: #888; margin-top: 4px;">CHARGE DISTRIBUTION (-4 to +4)</div>
+            <canvas id="alpha-charge-canvas" height="24" style="width: 100%; height: 24px; display: block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
+
+            <div style="font-size: 9px; color: #888; margin-top: 4px;">AGE DISTRIBUTION (SHAKES)</div>
+            <canvas id="alpha-age-canvas" height="24" style="width: 100%; height: 24px; display: block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
+        
         </div>
 
         <!-- MODULE PALETTE DRAWER (EDIT MODE) -->
@@ -313,7 +323,7 @@
         <div class="player-box">
             <div class="pane-title">SOURCE :: BETA</div>
             <div class="glyph-preview">
-                <canvas id="glyph-beta-canvas" width="128" height="128"></canvas>
+                <canvas id="glyph-beta-canvas" width="80" height="80"></canvas>
             </div>
             <div class="stat-line">
                 <span>DESIGNATION:</span>
@@ -349,6 +359,15 @@
             </div>
             <!-- NEW: Graph Strip Canvas under buttons -->
             <canvas id="beta-graph-canvas" height="30" style="width: 100%; height: 30px; display: block; margin-top: 6px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
+        
+            <div style="font-size: 9px; color: #888; margin-top: 6px;">SPEED DISTRIBUTION</div>
+            <canvas id="beta-speed-canvas" height="24" style="width: 100%; height: 24px; display: block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
+
+            <div style="font-size: 9px; color: #888; margin-top: 4px;">CHARGE DISTRIBUTION (-4 to +4)</div>
+            <canvas id="beta-charge-canvas" height="24" style="width: 100%; height: 24px; display: block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
+
+            <div style="font-size: 9px; color: #888; margin-top: 4px;">AGE DISTRIBUTION (SHAKES)</div>
+            <canvas id="beta-age-canvas" height="24" style="width: 100%; height: 24px; display: block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
         </div>
     </div>
 
@@ -508,6 +527,7 @@
 
         updateMetricBars();
         updateGraphStrips();
+        updateHistogramStrips();
     }
 
     let frameCount = 0;
@@ -1117,6 +1137,84 @@
             else ctx.lineTo(x, y);
         }
         ctx.stroke();
+    }
+
+    // Generic Barchart Histogram Renderer
+    function renderDistributionHistogram(canvasId, bins, baseColor) {
+        const cvs = document.getElementById(canvasId);
+        if (!cvs) return;
+        const ctx = cvs.getContext('2d');
+        const w = cvs.width;
+        const h = cvs.height;
+
+        ctx.clearRect(0, 0, w, h);
+        if (bins.length === 0) return;
+
+        const maxVal = Math.max(1, ...bins);
+        const barWidth = w / bins.length;
+
+        for (let i = 0; i < bins.length; i++) {
+            const valRatio = bins[i] / maxVal;
+            const barHeight = valRatio * (h - 2);
+            const x = i * barWidth;
+            const y = h - barHeight;
+
+            ctx.fillStyle = baseColor;
+            ctx.globalAlpha = 0.7;
+            ctx.fillRect(x + 1, y, Math.max(1, barWidth - 2), barHeight);
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+    // Binning Helper Functions
+    function computeHistograms(particles) {
+        // 1. Speed Bins: 0-50, 50-100, 100-150, 150-200, 200+
+        const speedBins = [0, 0, 0, 0, 0];
+        // 2. Charge Bins: -4, -3, -2, -1, 0, +1, +2, +3, +4
+        const chargeBins = Array(9).fill(0);
+        // 3. Age Bins in Shakes (1 shake = 10s): 0-1, 1-3, 3-6, 6-10, 10+ shakes[cite: 22]
+        const ageBins = [0, 0, 0, 0, 0];
+
+        particles.forEach(p => {
+            // Speed
+            const speed = Math.hypot(p.vx, p.vy);
+            const sIdx = Math.min(4, Math.floor(speed / 50));
+            speedBins[sIdx]++;
+
+            // Charge (-4 to +4)
+            const cIdx = Math.min(8, Math.max(0, p.chargeVal + 4));
+            chargeBins[cIdx]++;
+
+            // Age in Shakes[cite: 22]
+            const shakes = p.ageShakes; //[cite: 22]
+            let aIdx = 0;
+            if (shakes >= 10) aIdx = 4;
+            else if (shakes >= 6) aIdx = 3;
+            else if (shakes >= 3) aIdx = 2;
+            else if (shakes >= 1) aIdx = 1;
+            ageBins[aIdx]++;
+        });
+
+        return { speedBins, chargeBins, ageBins };
+    }
+
+    // Update loop hook in updateHUD()[cite: 22]
+    function updateHistogramStrips() {
+        const alphaParticles = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha'));
+        const betaParticles  = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta'));
+
+        const alphaData = computeHistograms(alphaParticles);
+        const betaData  = computeHistograms(betaParticles);
+
+        // Alpha Strip Charts
+        renderDistributionHistogram('alpha-speed-canvas', alphaData.speedBins, alphaEngine.intrinsicColor);
+        renderDistributionHistogram('alpha-charge-canvas', alphaData.chargeBins, alphaEngine.intrinsicColor);
+        renderDistributionHistogram('alpha-age-canvas', alphaData.ageBins, alphaEngine.intrinsicColor);
+
+        // Beta Strip Charts
+        renderDistributionHistogram('beta-speed-canvas', betaData.speedBins, betaEngine.intrinsicColor);
+        renderDistributionHistogram('beta-charge-canvas', betaData.chargeBins, betaEngine.intrinsicColor);
+        renderDistributionHistogram('beta-age-canvas', betaData.ageBins, betaEngine.intrinsicColor);
     }
 
 </script>
