@@ -1530,3 +1530,114 @@ class PaddleWheelModule extends ArenaModule {
         ctx.fillText('PADDLE WHEEL', c.x, this.y + 12);
     }
 }
+
+/**
+ * Destructible/Solid Wedge Module
+ * Quarter-sized mechanical barrier filling half of a square diagonally.
+ * Orientations:
+ *  - 'TL': Top-Left filled (hypotenuse from Top-Right to Bottom-Left)
+ *  - 'TR': Top-Right filled (hypotenuse from Top-Left to Bottom-Right)
+ *  - 'BR': Bottom-Right filled (hypotenuse from Top-Right to Bottom-Left)
+ *  - 'BL': Bottom-Left filled (hypotenuse from Top-Left to Bottom-Right)
+ */
+class WedgeModule extends ArenaModule {
+    constructor(id, x, y, width = 40, height = 40, orientation = 'BL') {
+        super(id, x, y, width, height, 'WEDGE');
+        this.orientation = orientation; // 'BL', 'TL', 'TR', 'BR'
+    }
+
+    affectParticle(particle, dt) {
+        // 1. Quick AABB Box Check
+        if (particle.x < this.x || particle.x > this.x + this.width ||
+            particle.y < this.y || particle.y > this.y + this.height) {
+            return;
+        }
+
+        // Relative coordinates inside the module box (0 to 1)
+        const rx = (particle.x - this.x) / this.width;
+        const ry = (particle.y - this.y) / this.height;
+
+        let insideSolid = false;
+        let nx = 0, ny = 0; // Normal vector pointing OUT of the ramp surface
+
+        // 2. Determine Half-Space Solid Area & Diagonal Normal Vector
+        const invSqrt2 = 0.7071; // Normalized diagonal normal component
+
+        switch (this.orientation) {
+            case 'BL': // Solid: Top-Left to Bottom-Right diagonal, filled towards Bottom-Left
+                if (ry >= rx) {
+                    insideSolid = true;
+                    nx = invSqrt2;
+                    ny = -invSqrt2;
+                }
+                break;
+            case 'TL': // Solid: Bottom-Left to Top-Right diagonal, filled towards Top-Left
+                if (ry <= (1 - rx)) {
+                    insideSolid = true;
+                    nx = invSqrt2;
+                    ny = invSqrt2;
+                }
+                break;
+            case 'TR': // Solid: Top-Left to Bottom-Right diagonal, filled towards Top-Right
+                if (ry <= rx) {
+                    insideSolid = true;
+                    nx = -invSqrt2;
+                    ny = invSqrt2;
+                }
+                break;
+            case 'BR': // Solid: Bottom-Left to Top-Right diagonal, filled towards Bottom-Right
+                if (ry >= (1 - rx)) {
+                    insideSolid = true;
+                    nx = -invSqrt2;
+                    ny = -invSqrt2;
+                }
+                break;
+        }
+
+        // 3. Resolve Penetration & Reflect Velocity Vector
+        if (insideSolid) {
+            // Eject particle slightly past the hypotenuse boundary
+            const nudge = 1.5;
+            particle.x += nx * nudge;
+            particle.y += ny * nudge;
+
+            // Reflect velocity: V_new = V - 2*(V · N)*N
+            const dot = particle.vx * nx + particle.vy * ny;
+            if (dot < 0) { // Only reflect if moving towards the surface
+                particle.vx -= 2 * dot * nx;
+                particle.vy -= 2 * dot * ny;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+
+        const x0 = this.x, y0 = this.y;
+        const x1 = this.x + this.width, y1 = this.y + this.height;
+
+        ctx.beginPath();
+        switch (this.orientation) {
+            case 'BL':
+                ctx.moveTo(x0, y1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0);
+                break;
+            case 'TL':
+                ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.lineTo(x0, y1);
+                break;
+            case 'TR':
+                ctx.moveTo(x1, y0); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0);
+                break;
+            case 'BR':
+                ctx.moveTo(x1, y1); ctx.lineTo(x0, y1); ctx.lineTo(x1, y0);
+                break;
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+}

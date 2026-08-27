@@ -468,6 +468,38 @@
                     </svg>
                     <span>PADDLE WHEEL</span>
                 </div>
+
+                <!-- WEDGE (BOTTOM-LEFT) -->
+                <div class="palette-card" draggable="true" data-type="WEDGE_BL">
+                    <svg viewBox="0 0 32 32">
+                        <polygon points="6,26 26,26 6,6" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>WEDGE (BL)</span>
+                </div>
+
+                <!-- WEDGE (TOP-LEFT) -->
+                <div class="palette-card" draggable="true" data-type="WEDGE_TL">
+                    <svg viewBox="0 0 32 32">
+                        <polygon points="6,6 26,6 6,26" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>WEDGE (TL)</span>
+                </div>
+
+                <!-- WEDGE (TOP-RIGHT) -->
+                <div class="palette-card" draggable="true" data-type="WEDGE_TR">
+                    <svg viewBox="0 0 32 32">
+                        <polygon points="26,6 26,26 6,6" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>WEDGE (TR)</span>
+                </div>
+
+                <!-- WEDGE (BOTTOM-RIGHT) -->
+                <div class="palette-card" draggable="true" data-type="WEDGE_BR">
+                    <svg viewBox="0 0 32 32">
+                        <polygon points="26,26 6,26 26,6" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>WEDGE (BR)</span>
+                </div>
             </div>
         </div>
 
@@ -952,15 +984,19 @@
             case 'KINETIC_SLOW':
                 return new KineticConverterModule(id, x, y, width, height, 'half');
             case 'BRICKS':
-                // Change threshold parameter (last argument):
-                // 0 = Breaks on any touch
-                // 150 = Requires boosted/high momentum particles to break
                 return new BricksModule(id, x, y, width, height, 0);
             case 'MAGNETIZER':
                 return new MagnetizerModule(id, x, y, width, height);
             case 'PADDLE_WHEEL':
-                // Speed preset 2 (medium), direction 1 (Clockwise)
                 return new PaddleWheelModule(id, x, y, width, height, 2, 1);
+            case 'WEDGE_BL':
+                return new WedgeModule(id, x, y, width/2, height/2, 'BL');
+            case 'WEDGE_TL':
+                return new WedgeModule(id, x, y, width/2, height/2, 'TL');
+            case 'WEDGE_TR':
+                return new WedgeModule(id, x, y, width/2, height/2, 'TR');
+            case 'WEDGE_BR':
+                return new WedgeModule(id, x, y, width/2, height/2, 'BR');
             default:
                 return null;
         }
@@ -987,13 +1023,16 @@
             if (!type) return;
 
             const rect = canvas.getBoundingClientRect();
-            const modWidth = 80;
-            const modHeight = 80;
+            
+            // Half-grid size for specific granular obstacles (40x40 px), standard (80x80 px) for main sources
+            const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_');
+            const modWidth = isGranular ? 40 : 80;
+            const modHeight = isGranular ? 40 : 80;
 
             let dropX = e.clientX - rect.left - (modWidth / 2);
             let dropY = e.clientY - rect.top - (modHeight / 2);
 
-            // Snap to secondary (fine) grid step
+            // Snap cleanly to fine grid (20px steps)
             const grid = arena.getGridDimensions(80, 4);
             dropX = Math.round(dropX / grid.secondaryStepX) * grid.secondaryStepX;
             dropY = Math.round(dropY / grid.secondaryStepY) * grid.secondaryStepY;
