@@ -1414,3 +1414,119 @@ class MagneticCluster {
         }
     }
 }
+
+/**
+ * Paddle Wheel Module (Mechanical Category)
+ * Rotates 10 spokes to transfer rotational momentum onto colliding particles.
+ */
+class PaddleWheelModule extends ArenaModule {
+    // 5 distinct rotational speed settings (rad/s)
+    static SPEED_PRESETS = [0.5, 1.5, 3.0, 5.0, 8.0];
+
+    constructor(id, x, y, width = 80, height = 80, speedIndex = 2, direction = 1) {
+        super(id, x, y, width, height, 'PADDLE_WHEEL');
+        this.numSpokes = 10;
+        this.radius = Math.min(width, height) / 2 - 4;
+        this.direction = Math.sign(direction) || 1; // 1: CW, -1: CCW
+        
+        // Speed configuration
+        this.speedIndex = Math.max(0, Math.min(speedIndex, PaddleWheelModule.SPEED_PRESETS.length - 1));
+        this.angularVelocity = PaddleWheelModule.SPEED_PRESETS[this.speedIndex] * this.direction;
+        this.rotationAngle = 0;
+    }
+
+    update(dt) {
+        this.rotationAngle += this.angularVelocity * dt;
+        // Keep angle normalized within [0, 2PI]
+        this.rotationAngle %= (Math.PI * 2);
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.dead) return;
+
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+
+        // Radial check against outer radius bounds
+        if (distSq > this.radius * this.radius) return;
+
+        const particleAngle = Math.atan2(dy, dx);
+        const spokeStep = (Math.PI * 2) / this.numSpokes;
+        const collisionThreshold = 0.08; // Angular collision distance threshold
+
+        for (let i = 0; i < this.numSpokes; i++) {
+            const currentSpokeAngle = (this.rotationAngle + i * spokeStep) % (Math.PI * 2);
+            
+            // Normalize angular delta to [-PI, PI]
+            let angleDiff = particleAngle - currentSpokeAngle;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+            if (Math.abs(angleDiff) < collisionThreshold) {
+                // Tangential linear velocity imparted by blade at radius r: v_tangent = omega * r
+                const dist = Math.sqrt(distSq);
+                const tangentialSpeed = this.angularVelocity * dist;
+
+                // Perpendicular tangent unit vector (-sin(theta), cos(theta))
+                const tx = -Math.sin(currentSpokeAngle);
+                const ty = Math.cos(currentSpokeAngle);
+
+                // Imbue rotational momentum onto particle
+                particle.vx += tx * tangentialSpeed * 1.5;
+                particle.vy += ty * tangentialSpeed * 1.5;
+
+                // Slight outward push to prevent sticking to blade line
+                particle.x += (dx / Math.max(1, dist)) * 2;
+                particle.y += (dy / Math.max(1, dist)) * 2;
+                break;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        ctx.save();
+        ctx.translate(c.x, c.y);
+
+        // Center hub
+        ctx.fillStyle = '#ffaa00';
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Outer circular boundary ring
+        ctx.strokeStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Render 10 Spokes / Blades
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = '#ffaa00';
+
+        const spokeStep = (Math.PI * 2) / this.numSpokes;
+        for (let i = 0; i < this.numSpokes; i++) {
+            const angle = this.rotationAngle + i * spokeStep;
+            const sx = Math.cos(angle) * this.radius;
+            const sy = Math.sin(angle) * this.radius;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(sx, sy);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+
+        ctx.font = '9px monospace';
+        ctx.fillStyle = '#ffaa00';
+        ctx.textAlign = 'center';
+        ctx.fillText('PADDLE WHEEL', c.x, this.y + 12);
+    }
+}

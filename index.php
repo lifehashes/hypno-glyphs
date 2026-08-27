@@ -401,7 +401,7 @@
         </div>
 
         <!-- SOURCE MODULE BETA -->
-        <div class="player-box">
+        <div class="player-box" id="beta-panel">
             <div class="pane-title">SOURCE :: BETA</div>
             <div class="glyph-preview">
                 <canvas id="glyph-beta-canvas" width="80" height="80"></canvas>
@@ -454,6 +454,23 @@
             <div style="font-size: 9px; color: #888; margin-top: 4px;">AGE DISTRIBUTION (SHAKES)</div>
             <canvas id="beta-age-canvas" height="24" style="width: 100%; height: 24px; display: block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
         </div>
+
+        <!-- MECHANICAL MODULE PALETTE DRAWER (EDIT MODE - RIGHT PANEL) -->
+        <div class="player-box editor-palette-box" id="editor-panel-mech">
+            <div class="pane-title" style="color:#ffaa00; border-color:#ffaa00;">EDITOR // MECHANICS</div>
+            <div class="palette-grid">
+                <!-- PADDLE WHEEL -->
+                <div class="palette-card" draggable="true" data-type="PADDLE_WHEEL">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#ffaa00" stroke-width="1.5" fill="none"/>
+                        <path d="M16 5 V27 M5 16 H27 M8 8 L24 24 M8 24 L24 8" stroke="#ffaa00" stroke-width="1.2"/>
+                        <circle cx="16" cy="16" r="3" fill="#ffaa00"/>
+                    </svg>
+                    <span>PADDLE WHEEL</span>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div class="controls-bar">
@@ -834,6 +851,48 @@
     let moduleCounter = 0;
 
     function toggleEditMode() {
+        window.isEditMode = !window.isEditMode;
+        const btn = document.getElementById('edit-mode-btn');
+        
+        // Panel elements
+        const alphaPanel = document.getElementById('alpha-panel');
+        const editorPanelLeft = document.getElementById('editor-panel');
+        const betaPanel = document.getElementById('beta-panel');
+        const editorPanelRight= document.getElementById('editor-panel-mech');
+
+        if (window.isEditMode) {
+            btn.innerText = "EDIT MODE: ON";
+            btn.style.borderColor = "#00ffff";
+            btn.style.color = "#00ffff";
+
+            // Swap Left: Alpha -> Physics Palette
+            alphaPanel.style.display = "none";
+            editorPanelLeft.style.display = "flex";
+
+            // Swap Right: Beta -> Mechanics Palette
+            if (betaPanel) betaPanel.style.display = "none";
+            if (editorPanelRight) editorPanelRight.style.display = "flex";
+        } else {
+            btn.innerText = "EDIT MODE: OFF";
+            btn.style.borderColor = "";
+            btn.style.color = "";
+
+            // Restore Left: Physics Palette -> Alpha
+            editorPanelLeft.style.display = "none";
+            alphaPanel.style.display = "flex";
+
+            // Restore Right: Mechanics Palette -> Beta
+            if (editorPanelRight) editorPanelRight.style.display = "none";
+            if (betaPanel) betaPanel.style.display = "flex";
+        }
+        
+        // Force immediate canvas re-render when toggling while paused
+        if (!isRunning) {
+            arena.renderOnly();
+        }
+    }
+
+    function toggleEditModeOLD() {
         window.isEditMode = !window.isEditMode; // Bind directly to window
         const btn = document.getElementById('edit-mode-btn');
         const alphaPanel = document.getElementById('alpha-panel');
@@ -899,6 +958,9 @@
                 return new BricksModule(id, x, y, width, height, 0);
             case 'MAGNETIZER':
                 return new MagnetizerModule(id, x, y, width, height);
+            case 'PADDLE_WHEEL':
+                // Speed preset 2 (medium), direction 1 (Clockwise)
+                return new PaddleWheelModule(id, x, y, width, height, 2, 1);
             default:
                 return null;
         }
