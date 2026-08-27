@@ -1533,12 +1533,8 @@ class PaddleWheelModule extends ArenaModule {
 
 /**
  * Destructible/Solid Wedge Module
- * Quarter-sized mechanical barrier filling half of a square diagonally.
- * Orientations:
- *  - 'TL': Top-Left filled (hypotenuse from Top-Right to Bottom-Left)
- *  - 'TR': Top-Right filled (hypotenuse from Top-Left to Bottom-Right)
- *  - 'BR': Bottom-Right filled (hypotenuse from Top-Right to Bottom-Left)
- *  - 'BL': Bottom-Left filled (hypotenuse from Top-Left to Bottom-Right)
+ * Fully solid triangular barrier.
+ * Particles bounce cleanly off all 3 faces (hypotenuse & both straight sides).
  */
 class WedgeModule extends ArenaModule {
     constructor(id, x, y, width = 40, height = 40, orientation = 'BL') {
@@ -1558,55 +1554,97 @@ class WedgeModule extends ArenaModule {
         const ry = (particle.y - this.y) / this.height;
 
         let insideSolid = false;
-        let nx = 0, ny = 0; // Normal vector pointing OUT of the ramp surface
+        let distHypotenuse = 0;
+        let hypNx = 0, hypNy = 0;
 
-        // 2. Determine Half-Space Solid Area & Diagonal Normal Vector
-        const invSqrt2 = 0.7071; // Normalized diagonal normal component
+        const invSqrt2 = 0.7071;
 
+        // 2. Check interior solid status & calculate distance to hypotenuse
         switch (this.orientation) {
-            case 'BL': // Solid: Top-Left to Bottom-Right diagonal, filled towards Bottom-Left
+            case 'BL': // Solid when ry >= rx
                 if (ry >= rx) {
                     insideSolid = true;
-                    nx = invSqrt2;
-                    ny = -invSqrt2;
+                    distHypotenuse = (ry - rx) * invSqrt2;
+                    hypNx = invSqrt2;
+                    hypNy = -invSqrt2;
                 }
                 break;
-            case 'TL': // Solid: Bottom-Left to Top-Right diagonal, filled towards Top-Left
+            case 'TL': // Solid when ry <= (1 - rx)
                 if (ry <= (1 - rx)) {
                     insideSolid = true;
-                    nx = invSqrt2;
-                    ny = invSqrt2;
+                    distHypotenuse = ((1 - rx) - ry) * invSqrt2;
+                    hypNx = invSqrt2;
+                    hypNy = invSqrt2;
                 }
                 break;
-            case 'TR': // Solid: Top-Left to Bottom-Right diagonal, filled towards Top-Right
+            case 'TR': // Solid when ry <= rx
                 if (ry <= rx) {
                     insideSolid = true;
-                    nx = -invSqrt2;
-                    ny = invSqrt2;
+                    distHypotenuse = (rx - ry) * invSqrt2;
+                    hypNx = -invSqrt2;
+                    hypNy = invSqrt2;
                 }
                 break;
-            case 'BR': // Solid: Bottom-Left to Top-Right diagonal, filled towards Bottom-Right
+            case 'BR': // Solid when ry >= (1 - rx)
                 if (ry >= (1 - rx)) {
                     insideSolid = true;
-                    nx = -invSqrt2;
-                    ny = -invSqrt2;
+                    distHypotenuse = (ry - (1 - rx)) * invSqrt2;
+                    hypNx = -invSqrt2;
+                    hypNy = -invSqrt2;
                 }
                 break;
         }
 
-        // 3. Resolve Penetration & Reflect Velocity Vector
-        if (insideSolid) {
-            // Eject particle slightly past the hypotenuse boundary
-            const nudge = 1.5;
-            particle.x += nx * nudge;
-            particle.y += ny * nudge;
+        if (!insideSolid) return;
 
-            // Reflect velocity: V_new = V - 2*(V · N)*N
-            const dot = particle.vx * nx + particle.vy * ny;
-            if (dot < 0) { // Only reflect if moving towards the surface
-                particle.vx -= 2 * dot * nx;
-                particle.vy -= 2 * dot * ny;
-            }
+        // 3. Determine distance to the two flat outer bounds (in normalized 0..1 units)
+        let distSideA = 0, nxSideA = 0, nySideA = 0;
+        let distSideB = 0, nxSideB = 0, nySideB = 0;
+
+        switch (this.orientation) {
+            case 'BL': // Flat sides: Left (x=0) and Bottom (y=1)
+                distSideA = rx;        nxSideA = -1; nySideA = 0;  // Left face
+                distSideB = 1 - ry;    nxSideB = 0;  nySideB = 1;  // Bottom face
+                break;
+            case 'TL': // Flat sides: Left (x=0) and Top (y=0)
+                distSideA = rx;        nxSideA = -1; nySideA = 0;  // Left face
+                distSideB = ry;        nxSideB = 0;  nySideB = -1; // Top face
+                break;
+            case 'TR': // Flat sides: Right (x=1) and Top (y=0)
+                distSideA = 1 - rx;    nxSideA = 1;  nySideA = 0;  // Right face
+                distSideB = ry;        nxSideB = 0;  nySideB = -1; // Top face
+                break;
+            case 'BR': // Flat sides: Right (x=1) and Bottom (y=1)
+                distSideA = 1 - rx;    nxSideA = 1;  nySideA = 0;  // Right face
+                distSideB = 1 - ry;    nxSideB = 0;  nySideB = 1;  // Bottom face
+                break;
+        }
+
+        // 4. Find closest edge (smallest distance) and assign its normal
+        let minDist = distHypotenuse;
+        let nx = hypNx;
+        let ny = hypNy;
+
+        if (distSideA < minDist) {
+            minDist = distSideA;
+            nx = nxSideA;
+            ny = nySideA;
+        }
+        if (distSideB < minDist) {
+            minDist = distSideB;
+            nx = nxSideB;
+            ny = nySideB;
+        }
+
+        // 5. Eject particle & reflect velocity
+        const nudge = 1.5;
+        particle.x += nx * nudge;
+        particle.y += ny * nudge;
+
+        const dot = particle.vx * nx + particle.vy * ny;
+        if (dot < 0) {
+            particle.vx -= 2 * dot * nx;
+            particle.vy -= 2 * dot * ny;
         }
     }
 
