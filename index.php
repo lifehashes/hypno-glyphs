@@ -500,6 +500,39 @@
                     </svg>
                     <span>WEDGE (BR)</span>
                 </div>
+
+                <!-- BLOCK SMALL -->
+                <div class="palette-card" draggable="true" data-type="BLOCK_SMALL">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="10" y="10" width="12" height="12" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>BLOCK (S)</span>
+                </div>
+
+                <!-- BLOCK STANDARD -->
+                <div class="palette-card" draggable="true" data-type="BLOCK">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="6" y="6" width="20" height="20" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>BLOCK (M)</span>
+                </div>
+
+                <!-- BAR HORIZONTAL -->
+                <div class="palette-card" draggable="true" data-type="BAR_H">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="11" y="6" width="10" height="20" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>BAR (H)</span>
+                </div>
+
+                <!-- BAR VERTICAL -->
+                <div class="palette-card" draggable="true" data-type="BAR_V">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="6" y="11" width="20" height="10" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>BAR (V)</span>
+                </div>
+
             </div>
         </div>
 
@@ -997,6 +1030,14 @@
                 return new WedgeModule(id, x, y, width/2, height/2, 'TR');
             case 'WEDGE_BR':
                 return new WedgeModule(id, x, y, width/2, height/2, 'BR');
+            case 'BLOCK_SMALL':
+                return new BlockSmallModule(id, x, y, 40, 40);
+            case 'BLOCK':
+                return new BlockModule(id, x, y, 80, 80);
+            case 'BAR_H':
+                return new BarHModule(id, x, y, 20, 80);
+            case 'BAR_V':
+                return new BarVModule(id, x, y, 80, 20);
             default:
                 return null;
         }
@@ -1024,10 +1065,23 @@
 
             const rect = canvas.getBoundingClientRect();
             
-            // Half-grid size for specific granular obstacles (40x40 px), standard (80x80 px) for main sources
-            const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_');
-            const modWidth = isGranular ? 40 : 80;
-            const modHeight = isGranular ? 40 : 80;
+            const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_') || type === 'BLOCK_SMALL';
+            const isBarH = type === 'BAR_H';
+            const isBarV = type === 'BAR_V';
+
+            let modWidth = 80;
+            let modHeight = 80;
+
+            if (isGranular) {
+                modWidth = 40;
+                modHeight = 40;
+            } else if (isBarH) {
+                modWidth = 20;
+                modHeight = 80;
+            } else if (isBarV) {
+                modWidth = 80;
+                modHeight = 20;
+            }
 
             let dropX = e.clientX - rect.left - (modWidth / 2);
             let dropY = e.clientY - rect.top - (modHeight / 2);

@@ -1679,3 +1679,199 @@ class WedgeModule extends ArenaModule {
         ctx.restore();
     }
 }
+
+/**
+ * Block (Half / Wedge Size: 40x40)
+ */
+class BlockSmallModule extends ArenaModule {
+    constructor(id, x, y, width = 40, height = 40) {
+        super(id, x, y, width, height, 'BLOCK_SMALL');
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.x < this.x || particle.x > this.x + this.width ||
+            particle.y < this.y || particle.y > this.y + this.height) {
+            return;
+        }
+
+        const distLeft = Math.abs(particle.x - this.x);
+        const distRight = Math.abs(particle.x - (this.x + this.width));
+        const distTop = Math.abs(particle.y - this.y);
+        const distBottom = Math.abs(particle.y - (this.y + this.height));
+
+        const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+        const nudge = 1.5;
+
+        if (minDist === distLeft) {
+            particle.x = this.x - nudge;
+            particle.vx *= -1;
+        } else if (minDist === distRight) {
+            particle.x = this.x + this.width + nudge;
+            particle.vx *= -1;
+        } else if (minDist === distTop) {
+            particle.y = this.y - nudge;
+            particle.vy *= -1;
+        } else {
+            particle.y = this.y + this.height + nudge;
+            particle.vy *= -1;
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+/**
+ * Block (Standard Size: 80x80)
+ */
+class BlockModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 80) {
+        super(id, x, y, width, height, 'BLOCK');
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.x < this.x || particle.x > this.x + this.width ||
+            particle.y < this.y || particle.y > this.y + this.height) {
+            return;
+        }
+
+        const distLeft = Math.abs(particle.x - this.x);
+        const distRight = Math.abs(particle.x - (this.x + this.width));
+        const distTop = Math.abs(particle.y - this.y);
+        const distBottom = Math.abs(particle.y - (this.y + this.height));
+
+        const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+        const nudge = 1.5;
+
+        if (minDist === distLeft) {
+            particle.x = this.x - nudge;
+            particle.vx *= -1;
+        } else if (minDist === distRight) {
+            particle.x = this.x + this.width + nudge;
+            particle.vx *= -1;
+        } else if (minDist === distTop) {
+            particle.y = this.y - nudge;
+            particle.vy *= -1;
+        } else {
+            particle.y = this.y + this.height + nudge;
+            particle.vy *= -1;
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+/**
+ * Bar Horizontal (40x80)
+ */
+class BarHModule extends ArenaModule {
+    constructor(id, x, y, width = 40, height = 20) {
+        super(id, x, y, width, height, 'BAR_H');
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.x < this.x || particle.x > this.x + this.width ||
+            particle.y < this.y || particle.y > this.y + this.height) {
+            return;
+        }
+
+        const distLeft = Math.abs(particle.x - this.x);
+        const distRight = Math.abs(particle.x - (this.x + this.width));
+        const distTop = Math.abs(particle.y - this.y);
+        const distBottom = Math.abs(particle.y - (this.y + this.height));
+
+        const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+        const nudge = 1.5;
+
+        if (minDist === distLeft) {
+            particle.x = this.x - nudge;
+            particle.vx *= -1;
+        } else if (minDist === distRight) {
+            particle.x = this.x + this.width + nudge;
+            particle.vx *= -1;
+        } else if (minDist === distTop) {
+            particle.y = this.y - nudge;
+            particle.vy *= -1;
+        } else {
+            particle.y = this.y + this.height + nudge;
+            particle.vy *= -1;
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+/**
+ * Bar Vertical (80x40)
+ */
+class BarVModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 20) {
+        super(id, x, y, width, height, 'BAR_V');
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.x < this.x || particle.x > this.x + this.width ||
+            particle.y < this.y || particle.y > this.y + this.height) {
+            return;
+        }
+
+        const distLeft = Math.abs(particle.x - this.x);
+        const distRight = Math.abs(particle.x - (this.x + this.width));
+        const distTop = Math.abs(particle.y - this.y);
+        const distBottom = Math.abs(particle.y - (this.y + this.height));
+
+        const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+        const nudge = 1.5;
+
+        if (minDist === distLeft) {
+            particle.x = this.x - nudge;
+            particle.vx *= -1;
+        } else if (minDist === distRight) {
+            particle.x = this.x + this.width + nudge;
+            particle.vx *= -1;
+        } else if (minDist === distTop) {
+            particle.y = this.y - nudge;
+            particle.vy *= -1;
+        } else {
+            particle.y = this.y + this.height + nudge;
+            particle.vy *= -1;
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
