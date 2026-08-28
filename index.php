@@ -565,15 +565,16 @@
         <!-- Gravity Slider -->
         <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
             <label for="gravity-slider">GRAVITY WELL:</label>
-            <input type="range" id="gravity-slider" min="-20000000" max="20000000" step="1000000" value="10000" oninput="updateGravity(this.value)">
-            <span id="gravity-val">10000</span>
+            <!-- Range represents the EXPONENT directly: -9 to +9 with 0 in the middle -->
+            <input type="range" id="gravity-slider" min="-9" max="9" step="0.1" value="4" oninput="updateGravityFromExponent(this.value)">
+            <span id="gravity-val">+1.0E+4</span>
         </div>
 
         <!-- Capacitor Strength Slider -->
         <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
             <label for="capacitor-slider">CAPACITOR FORCE:</label>
-            <input type="range" id="capacitor-slider" min="0" max="100000" step="5000" value="18000" oninput="updateCapacitorStrength(this.value)">
-            <span id="capacitor-val">18000</span>
+            <input type="range" id="capacitor-slider" min="0" max="1000000000" step="10000000" value="1000000" oninput="updateCapacitorStrength(this.value)">
+            <span id="capacitor-val">+1.0E+6</span>
         </div>
 
         <!-- Boundary Mode Selector Button -->
@@ -611,6 +612,42 @@
     const betaEngine  = new LifeEngine('glyph-beta-canvas', 16);
     const arena       = new ArenaManager('physics-canvas');
     const scores = { alphaScore: 0, betaScore: 0 };
+
+    // Formats numbers into scientific notation with forced 1 decimal place (e.g. +1.0E+7, -1.0E-4, +0.0E+0)
+    function formatSciExponent(value) {
+        const num = parseFloat(value);
+        if (num === 0 || isNaN(num)) return "+0.0E+0";
+
+        const sign = num > 0 ? "+" : "-";
+        const absVal = Math.abs(num);
+        
+        const exp = Math.floor(Math.log10(absVal));
+        const mantissa = absVal / Math.pow(10, exp);
+        
+        const expSign = exp >= 0 ? "+" : "-";
+        const absExp = Math.abs(exp);
+
+        // Always format mantissa to 1 decimal place
+        const formattedMantissa = mantissa.toFixed(1);
+
+        return `${sign}${formattedMantissa}E${expSign}${absExp}`;
+    }
+
+    function updateGravityFromExponent(expVal) {
+        const exp = parseFloat(expVal);
+        
+        // Near zero threshold (deadzone for absolute zero gravity)
+        if (Math.abs(exp) < 0.1) {
+            updateGravity(0);
+            return;
+        }
+
+        // Convert exponent step back to full magnitude (e.g., 10^7 or -10^7)
+        const sign = exp >= 0 ? 1 : -1;
+        const actualValue = sign * Math.pow(10, Math.abs(exp));
+        
+        updateGravity(actualValue);
+    }
 
     function getRandomDatabaseGlyph() {
         if (!databaseGlyphs || databaseGlyphs.length === 0) return null;
@@ -658,42 +695,14 @@
         const alphaX = padding;
         const betaX  = stageWidth - modWidth - padding;
 
-        /*
-        arena.addModule(new SourceSpawnModule('alpha_src', alphaX, centerY, modWidth, modHeight, alphaEngine, 'ALPHA'));
-        arena.addModule(new SourceSpawnModule('beta_src', betaX, centerY, modWidth, modHeight, betaEngine, 'BETA'));
-        
-        arena.addModule(new SinkModule('center_sink', centerX, centerY, modWidth, modHeight, scores));
-        */
-
         const verticalOffset = 150;
         const currentGravity = parseFloat(document.getElementById('gravity-slider').value) || 8000;
-
-        /*
-        arena.addModule(new AttractorModule('gravity_top', centerX, centerY - verticalOffset, modWidth, modHeight, currentGravity));
-        arena.addModule(new AttractorModule('gravity_bottom', centerX, centerY + verticalOffset, modWidth, modHeight, currentGravity));
-        */
-
         const horizontalOffset = 160;
-        /*
-        arena.addModule(new QCDInverterModule('qcd_left', centerX - horizontalOffset, centerY, modWidth, modHeight));
-        arena.addModule(new QCDInverterModule('qcd_right', centerX + horizontalOffset, centerY, modWidth, modHeight));
-
-        arena.addModule(new DoublerModule('doubler_top', centerX - horizontalOffset, centerY - verticalOffset, modWidth, modHeight));
-        arena.addModule(new DoublerModule('doubler_bottom', centerX + horizontalOffset, centerY + verticalOffset, modWidth, modHeight));  
-        
-        arena.addModule(new ChargerModule('charger_pos', centerX - horizontalOffset, centerY + verticalOffset, modWidth, modHeight, +1));
-        arena.addModule(new ChargerModule('charger_neg', centerX + horizontalOffset, centerY - verticalOffset, modWidth, modHeight, -1));
-        */
-
         const currentCapacitorStrength = parseFloat(document.getElementById('capacitor-slider').value) || 18000;
-        /*
-        arena.addModule(new CapacitorModule('cap_pos', centerX - horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 4, currentCapacitorStrength));
-        arena.addModule(new CapacitorModule('cap_neg', centerX + horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, -4, currentCapacitorStrength));
 
-        arena.addModule(new KineticConverterModule('kinetic_fast', centerX - horizontalOffset, centerY - verticalOffset * 0.5, modWidth, modHeight, 'double'));
-        arena.addModule(new KineticConverterModule('kinetic_slow', centerX + horizontalOffset, centerY + verticalOffset * 0.5, modWidth, modHeight, 'half'));
-        */
-
+        // Initialize display values with scientific notation format
+        updateGravity(currentGravity);
+        updateCapacitorStrength(currentCapacitorStrength);
     }
 
     function getRandomBinary(length) {
@@ -868,7 +877,7 @@
 
     function updateGravity(value) {
         const val = parseFloat(value);
-        document.getElementById('gravity-val').innerText = val;
+        document.getElementById('gravity-val').innerText = formatSciExponent(val);
 
         // Iterate through all placed modules in the arena
         arena.modules.forEach(mod => {
@@ -885,7 +894,7 @@
 
     function updateCapacitorStrength(value) {
         const val = parseFloat(value);
-        document.getElementById('capacitor-val').innerText = val;
+        document.getElementById('capacitor-val').innerText = formatSciExponent(val);
 
         arena.modules.forEach(mod => {
             if (mod.type === 'CAPACITOR') {
@@ -970,36 +979,6 @@
         }
         
         // Force immediate canvas re-render when toggling while paused
-        if (!isRunning) {
-            arena.renderOnly();
-        }
-    }
-
-    function toggleEditModeOLD() {
-        window.isEditMode = !window.isEditMode; // Bind directly to window
-        const btn = document.getElementById('edit-mode-btn');
-        const alphaPanel = document.getElementById('alpha-panel');
-        const editorPanel = document.getElementById('editor-panel');
-
-        if (window.isEditMode) {
-            btn.innerText = "EDIT MODE: ON";
-            btn.style.borderColor = "#00ffff";
-            btn.style.color = "#00ffff";
-
-            // Hide Alpha, Show Palette
-            alphaPanel.style.display = "none";
-            editorPanel.style.display = "flex";
-        } else {
-            btn.innerText = "EDIT MODE: OFF";
-            btn.style.borderColor = "";
-            btn.style.color = "";
-
-            // Restore Alpha Panel
-            editorPanel.style.display = "none";
-            alphaPanel.style.display = "flex";
-        }
-        
-        // Force a re-render frame immediately on toggle
         if (!isRunning) {
             arena.renderOnly();
         }
@@ -1317,7 +1296,6 @@
     }
 
     // 4. Update HUD Loop Integration
-    // (Incorporate these calls into your existing updateHUD() function)
     function updateMetricBars() {
         const alphaCount = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha')).length;
         const betaCount  = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta')).length;
@@ -1497,7 +1475,7 @@
         const speedBins = [0, 0, 0, 0, 0];
         // 2. Charge Bins: -4, -3, -2, -1, 0, +1, +2, +3, +4
         const chargeBins = Array(9).fill(0);
-        // 3. Age Bins in Shakes (1 shake = 10s): 0-1, 1-3, 3-6, 6-10, 10+ shakes[cite: 22]
+        // 3. Age Bins in Shakes (1 shake = 10s): 0-1, 1-3, 3-6, 6-10, 10+ shakes
         const ageBins = [0, 0, 0, 0, 0];
 
         particles.forEach(p => {
@@ -1510,8 +1488,8 @@
             const cIdx = Math.min(8, Math.max(0, p.chargeVal + 4));
             chargeBins[cIdx]++;
 
-            // Age in Shakes[cite: 22]
-            const shakes = p.ageShakes; //[cite: 22]
+            // Age in Shakes
+            const shakes = p.ageShakes;
             let aIdx = 0;
             if (shakes >= 10) aIdx = 4;
             else if (shakes >= 6) aIdx = 3;
@@ -1523,7 +1501,6 @@
         return { speedBins, chargeBins, ageBins };
     }
 
-    // Update loop hook in updateHUD()[cite: 22]
     function updateHistogramStrips() {
         const alphaParticles = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha'));
         const betaParticles  = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta'));
@@ -1573,10 +1550,10 @@
         timerDisplay.style.borderColor = "#ff3366";
 
         if (action === 'GRAVITY') {
-            // Max gravity slider to +20,000,000
+            // Max gravity slider to +1.0E+9 (+1,000,000,000)
             const gravitySlider = document.getElementById('gravity-slider');
-            gravitySlider.value = 20000000;
-            updateGravity(20000000);
+            gravitySlider.value = 1000000000;
+            updateGravity(1000000000);
         } else if (action === 'GEOMETRY') {
             // Force arena boundary mode to NONE
             arena.boundaryMode = 'none';
