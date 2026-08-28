@@ -2,31 +2,35 @@
  * 1. Particle Definition
  * Simple physical entities that move through the arena.
  */
-/**
- * 1. Particle Definition
- * Simple physical entities that move through the arena.
- */
 class Particle {
     constructor(x, y, vx, vy, charge = 1, color = '#ffffff', radius = 2.5, mass = 1.0) {
+        // Core spatial & physical properties
         this.x = x;
         this.y = y;
         this.vx = vx;
         this.vy = vy;
         this.ax = 0;
         this.ay = 0;
-        this.charge = charge;
-        this.chargeVal = 0; // Electrical charge: -4 to +4
+        
+        this.chargeVal = charge;
         this.color = color;
         this.radius = radius;
         this.mass = mass;
-        this.life = 1.0;
-        this.dead = false;
+        
+        // Render & State flags
+        this.life = 1.0;          // Fixed: Added opacity life value
+        this.dead = false;        // Fixed: Added lifecycle status flag
         this.isAnti = false;
-        this.ringRotation = 0; // Rotation angle for animated shell spinning
-
-        // Age tracking in seconds and shakes
+        this.isMagnetic = false;
+        this.ringRotation = 0;
+        
+        // Age tracking
         this.ageSeconds = 0;
-        this.ageShakes = 0; // 1 shake = 10 seconds
+        this.ageShakes = 0;
+
+        // Tracked state & radar pulse properties
+        this.isTracked = false;
+        this.pulseTimer = 0;
     }
 
     update(dt) {
@@ -35,14 +39,17 @@ class Particle {
         this.x += this.vx * dt;
         this.y += this.vy * dt;
 
-        // Accumulate runtime age
         this.ageSeconds += dt;
         this.ageShakes = Math.floor(this.ageSeconds / 10);
+
+        // Update pulse timer (cycles every 1.2 seconds)
+        if (this.isTracked) {
+            this.pulseTimer = (this.pulseTimer + dt) % 1.2;
+        }
 
         this.ax = 0;
         this.ay = 0;
 
-        // Rotate concentric rings: Clockwise for positive, Counter-clockwise for negative
         if (this.chargeVal !== 0) {
             const dir = Math.sign(this.chargeVal);
             this.ringRotation += dir * dt * 4;
@@ -50,8 +57,36 @@ class Particle {
     }
 
     draw(ctx) {
+        // RADAR PULSE (Drawn under particle body)
+        if (this.isTracked) {
+            ctx.save();
+            const maxPulseRadius = this.radius + 35;
+            const progress = this.pulseTimer / 1.2;
+            const currentPulseRadius = this.radius + (maxPulseRadius - this.radius) * progress;
+            const alpha = 1.0 - progress;
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius + 4, 0, Math.PI * 2);
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffcc';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, currentPulseRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(0, 255, 204, ${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#00ffcc';
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Standard Particle Drawing
         ctx.save();
-        ctx.globalAlpha = this.life;
+        ctx.globalAlpha = this.life ?? 1.0; // Fallback ensures visibility
         ctx.strokeStyle = this.color;
         ctx.fillStyle = this.color;
         ctx.shadowBlur = 6;
@@ -67,7 +102,7 @@ class Particle {
             ctx.fill();
         }
 
-        // Render thin concentric shells based on absolute charge value
+        // Concentric charge rings
         const numRings = Math.abs(this.chargeVal);
         if (numRings > 0) {
             ctx.save();
@@ -75,12 +110,11 @@ class Particle {
             ctx.rotate(this.ringRotation);
             ctx.shadowBlur = 0;
             ctx.lineWidth = 0.8;
-            ctx.strokeStyle = this.chargeVal > 0 ? '#00e1ff' : '#ff3366'; // Blue (+) / Red (-)
+            ctx.strokeStyle = this.chargeVal > 0 ? '#00e1ff' : '#ff3366';
 
             for (let r = 1; r <= numRings; r++) {
                 const ringRadius = this.radius + 1.0 + r * 2.2;
                 ctx.beginPath();
-                // Draw thin arc shells with gaps to make rotation visible
                 ctx.arc(0, 0, ringRadius, 0, Math.PI * 1.5);
                 ctx.stroke();
             }
@@ -217,7 +251,7 @@ class SourceSpawnModule extends ArenaModule {
                         const vy = (dy / dist) * baseSpeed;
 
                         // Emit particle with dynamic or default radius and mass
-                        const p = new Particle(spawnX, spawnY, vx, vy, 1.0, color, particleRadius, particleMass);
+                        const p = new Particle(spawnX, spawnY, vx, vy, 0, color, particleRadius, particleMass);
                         p.sourceId = this.id;
                         p.originHash = this.engine.originHash;
                         p.currentHash = this.engine.currentHash;
@@ -309,6 +343,9 @@ class ArenaManager {
 
         this.globalGravityEnabled = false;
         this.globalGravityForce = 300; // Adjust force intensity as desired
+
+        this.setupParticleTrackingInteraction();
+
     }
 
     addModule(module) { this.modules.set(module.id, module); }
@@ -325,6 +362,35 @@ class ArenaManager {
             mod.width = modWidth;
             mod.height = modHeight;
             idx++;
+        });
+    }
+
+    setupParticleTrackingInteraction() {
+        this.canvas.addEventListener('click', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            const maxSelectDistance = 15; // Click tolerance in pixels
+            let closestParticle = null;
+            let minDistanceSq = maxSelectDistance * maxSelectDistance;
+
+            for (const p of this.particles) {
+                if (p.dead) continue;
+                const dx = p.x - clickX;
+                const dy = p.y - clickY;
+                const distSq = dx * dx + dy * dy;
+
+                if (distSq < minDistanceSq) {
+                    minDistanceSq = distSq;
+                    closestParticle = p;
+                }
+            }
+
+            if (closestParticle) {
+                // Toggle tracking state on click
+                closestParticle.isTracked = !closestParticle.isTracked;
+            }
         });
     }
 
