@@ -597,6 +597,7 @@
             <select id="action-select" style="background:#0f141e; color:#00ffff; border:1px solid rgba(0,255,255,0.3); padding:3px 6px; font-family:monospace; font-size:11px; border-radius:3px; cursor:pointer;">
                 <option value="GRAVITY">MAX GRAVITY</option>
                 <option value="GEOMETRY">NO BOUNDARIES</option>
+                <option value="DESTROY_ALL">DESTROY ALL</option>
             </select>
         </div>
     </div>
@@ -1585,6 +1586,17 @@
             // Force arena boundary mode to NONE
             arena.boundaryMode = 'none';
             document.getElementById('boundary-btn').innerText = 'BOUNDARIES: NONE';
+        } else if (action === 'DESTROY_ALL') {
+            // Instantly clear all active particles and clusters from the arena
+            arena.particles = [];
+            if (arena.clusters) {
+                arena.clusters = [];
+            }
+            
+            // Re-render immediate blank frame if engine paused
+            if (!isRunning) {
+                arena.renderOnly();
+            }
         }
     }
 
