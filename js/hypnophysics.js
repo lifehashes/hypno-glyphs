@@ -994,7 +994,7 @@ class DoublerModule extends ArenaModule {
                 particle.y,
                 cloneVx,
                 cloneVy,
-                particle.charge,
+                particle.chargeVal, // Fixed: use particle.chargeVal instead of particle.charge
                 particle.color,
                 particle.radius,
                 particle.mass

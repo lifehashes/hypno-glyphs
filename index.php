@@ -588,6 +588,7 @@
             <label for="timer-select">LIMIT:</label>
             <select id="timer-select" onchange="resetMatchTimer()" style="background:#0f141e; color:#42f485; border:1px solid rgba(66,244,133,0.3); padding:3px 6px; font-family:monospace; font-size:11px; border-radius:3px; cursor:pointer;">
                 <option value="0">OFF</option>
+                <option value="60">1 MIN</option>
                 <option value="300">5 MIN</option>
                 <option value="600">10 MIN</option>
                 <option value="900">15 MIN</option>
