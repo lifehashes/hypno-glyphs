@@ -1875,3 +1875,81 @@ class BarVModule extends ArenaModule {
         ctx.restore();
     }
 }
+
+/**
+ * Osmosis Module
+ * Semi-transparent permeable barrier. Solid wall for opposing particles; 
+ * permeable pass-through for aligned particles of the matching side.
+ */
+class OsmosisModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 80, intrinsicColor = '#42f485', side = 'ALPHA') {
+        super(id, x, y, width, height, 'OSMOSIS');
+        this.intrinsicColor = intrinsicColor;
+        this.side = side.toLowerCase();
+    }
+
+    affectParticle(particle, dt) {
+        // Allow pass-through if the particle matches this module's origin side
+        if (particle.sourceId && particle.sourceId.toLowerCase().includes(this.side)) {
+            return;
+        }
+
+        const radius = 2.5; // Particle radius
+
+        // Resolve rectangular solid box collisions for opposing particles
+        if (particle.x + radius > this.x && particle.x - radius < this.x + this.width &&
+            particle.y + radius > this.y && particle.y - radius < this.y + this.height) {
+
+            // Calculate overlap distances from each border edge
+            const overlapLeft   = (particle.x + radius) - this.x;
+            const overlapRight  = (this.x + this.width) - (particle.x - radius);
+            const overlapTop    = (particle.y + radius) - this.y;
+            const overlapBottom = (this.y + this.height) - (particle.y - radius);
+
+            // Find the minimum overlap depth to determine collision axis
+            const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+            if (minOverlap === overlapLeft) {
+                particle.x = this.x - radius;
+                particle.vx *= -1;
+            } else if (minOverlap === overlapRight) {
+                particle.x = this.x + this.width + radius;
+                particle.vx *= -1;
+            } else if (minOverlap === overlapTop) {
+                particle.y = this.y - radius;
+                particle.vy *= -1;
+            } else if (minOverlap === overlapBottom) {
+                particle.y = this.y + this.height + radius;
+                particle.vy *= -1;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+
+        // 1. Fill semi-transparent interior with intrinsic hue
+        ctx.fillStyle = this.intrinsicColor;
+        ctx.globalAlpha = 0.18;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        // 2. Render dashed/solid border in intrinsic color
+        ctx.globalAlpha = 0.8;
+        ctx.strokeStyle = this.intrinsicColor;
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = this.intrinsicColor;
+        ctx.setLineDash([6, 3]);
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+        // 3. Label text
+        ctx.setLineDash([]);
+        ctx.font = '9px monospace';
+        ctx.fillStyle = this.intrinsicColor;
+        ctx.textAlign = 'center';
+        ctx.fillText(`OSMOSIS [${this.side.toUpperCase()}]`, this.center.x, this.y + 12);
+
+        ctx.restore();
+    }
+}

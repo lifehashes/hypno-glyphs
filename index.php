@@ -533,6 +533,24 @@
                     <span>BAR (V)</span>
                 </div>
 
+                <!-- OSMOSIS ALPHA -->
+                <div class="palette-card" draggable="true" data-type="OSMOSIS_ALPHA">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="6" y="6" width="20" height="20" stroke="#42f485" stroke-width="1.5" stroke-dasharray="3 2" fill="rgba(66, 244, 133, 0.15)"/>
+                        <path d="M12 16 H20 M16 12 V20" stroke="#42f485" stroke-width="1.2"/>
+                    </svg>
+                    <span>OSMOSIS ALPHA</span>
+                </div>
+
+                <!-- OSMOSIS BETA -->
+                <div class="palette-card" draggable="true" data-type="OSMOSIS_BETA">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="6" y="6" width="20" height="20" stroke="#00e1ff" stroke-width="1.5" stroke-dasharray="3 2" fill="rgba(0, 225, 255, 0.15)"/>
+                        <path d="M12 16 H20 M16 12 V20" stroke="#00e1ff" stroke-width="1.2"/>
+                    </svg>
+                    <span>OSMOSIS BETA</span>
+                </div>
+
             </div>
         </div>
 
@@ -1038,6 +1056,10 @@
                 return new BarHModule(id, x, y, 20, 80);
             case 'BAR_V':
                 return new BarVModule(id, x, y, 80, 20);
+            case 'OSMOSIS_ALPHA':
+                return new OsmosisModule(id, x, y, width, height, alphaEngine.intrinsicColor, 'ALPHA');
+            case 'OSMOSIS_BETA':
+                return new OsmosisModule(id, x, y, width, height, betaEngine.intrinsicColor, 'BETA');                
             default:
                 return null;
         }
