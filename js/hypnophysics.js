@@ -2,8 +2,12 @@
  * 1. Particle Definition
  * Simple physical entities that move through the arena.
  */
+/**
+ * 1. Particle Definition
+ * Simple physical entities that move through the arena.
+ */
 class Particle {
-    constructor(x, y, vx, vy, charge = 1, color = '#ffffff') {
+    constructor(x, y, vx, vy, charge = 1, color = '#ffffff', radius = 2.5, mass = 1.0) {
         this.x = x;
         this.y = y;
         this.vx = vx;
@@ -13,15 +17,16 @@ class Particle {
         this.charge = charge;
         this.chargeVal = 0; // Electrical charge: -4 to +4
         this.color = color;
+        this.radius = radius;
+        this.mass = mass;
         this.life = 1.0;
         this.dead = false;
         this.isAnti = false;
         this.ringRotation = 0; // Rotation angle for animated shell spinning
 
-        // NEW: Age tracking in seconds and shakes
+        // Age tracking in seconds and shakes
         this.ageSeconds = 0;
         this.ageShakes = 0; // 1 shake = 10 seconds
-
     }
 
     update(dt) {
@@ -32,7 +37,7 @@ class Particle {
 
         // Accumulate runtime age
         this.ageSeconds += dt;
-        this.ageShakes = Math.floor(this.ageSeconds / 10); //
+        this.ageShakes = Math.floor(this.ageSeconds / 10);
 
         this.ax = 0;
         this.ay = 0;
@@ -53,7 +58,7 @@ class Particle {
         ctx.shadowColor = this.color;
 
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
 
         if (this.isAnti) {
             ctx.lineWidth = 1.2;
@@ -73,7 +78,7 @@ class Particle {
             ctx.strokeStyle = this.chargeVal > 0 ? '#00e1ff' : '#ff3366'; // Blue (+) / Red (-)
 
             for (let r = 1; r <= numRings; r++) {
-                const ringRadius = 3.5 + r * 2.2;
+                const ringRadius = this.radius + 1.0 + r * 2.2;
                 ctx.beginPath();
                 // Draw thin arc shells with gaps to make rotation visible
                 ctx.arc(0, 0, ringRadius, 0, Math.PI * 1.5);
@@ -131,6 +136,9 @@ class ArenaModule {
 /**
  * 3. Source / Spawn Module (Emits particles based on live outer edge cells)
  */
+/**
+ * 3. Source / Spawn Module (Emits particles based on live outer edge cells)
+ */
 class SourceSpawnModule extends ArenaModule {
     constructor(id, x, y, width, height, lifeEngine, label = 'EMITTER') {
         super(id, x, y, width, height, 'SOURCE_SPAWN');
@@ -168,6 +176,18 @@ class SourceSpawnModule extends ArenaModule {
             const color = this.engine.intrinsicColor;
             const baseSpeed = 80;
 
+            // Compute size and mass deterministically using originHash characters[cite: 3]
+            const originHash = this.engine.originHash || '';
+            const lastChar = originHash.length > 0 ? originHash.charAt(originHash.length - 1) : '0';
+            const secondLastChar = originHash.length > 1 ? originHash.charAt(originHash.length - 2) : '0';
+
+            // Map hexadecimal char 0-f (0-15) to range 1-16
+            const sizeValue = parseInt(lastChar, 16) % 16 + 1;
+            const massValue = parseInt(secondLastChar, 16) % 16 + 1;
+
+            const particleRadius = (typeof window !== 'undefined' && window.variableSizeEnabled) ? sizeValue : 2.5;
+            const particleMass = (typeof window !== 'undefined' && window.variableMassEnabled) ? massValue : 1.0;
+
             // Iterate over the grid to locate outer edge live cells
             for (let y = 0; y < n; y++) {
                 for (let x = 0; x < n; x++) {
@@ -196,8 +216,8 @@ class SourceSpawnModule extends ArenaModule {
                         const vx = (dx / dist) * baseSpeed;
                         const vy = (dy / dist) * baseSpeed;
 
-                        // Emit particle from exact edge cell position
-                        const p = new Particle(spawnX, spawnY, vx, vy, 1.0, color);
+                        // Emit particle with dynamic or default radius and mass
+                        const p = new Particle(spawnX, spawnY, vx, vy, 1.0, color, particleRadius, particleMass);
                         p.sourceId = this.id;
                         p.originHash = this.engine.originHash;
                         p.currentHash = this.engine.currentHash;
@@ -309,12 +329,12 @@ class ArenaManager {
     }
 
     handleParticleBoundaries(p) {
-        const r = 2.5;
+        const r = p.radius || 2.5;
         const w = this.canvas.width;
         const h = this.canvas.height;
 
         if (this.boundaryMode === 'none') {
-            if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+            if (p.x < -r || p.x > w + r || p.y < -r || p.y > h + r) {
                 p.dead = true;
             }
         } else if (this.boundaryMode === 'toroidal') {
@@ -449,9 +469,6 @@ class ArenaManager {
     }
 
     handleParticleCollisions() {
-        const particleRadius = 2.5;
-        const minDist = particleRadius * 2;
-        const minDistSq = minDist * minDist;
         const len = this.particles.length;
 
         for (let i = 0; i < len; i++) {
@@ -467,6 +484,8 @@ class ArenaManager {
                 const dx = p2.x - p1.x;
                 const dy = p2.y - p1.y;
                 const distSq = dx * dx + dy * dy;
+                const minDist = p1.radius + p2.radius;
+                const minDistSq = minDist * minDist;
 
                 if (distSq < minDistSq && distSq > 0) {
                     
@@ -474,7 +493,7 @@ class ArenaManager {
                     if (p1.isMagnetic && p2.isMagnetic) {
                         if (!p1.cluster && !p2.cluster) {
                             const cluster = new MagneticCluster(p1, p2);
-                            this.clusters.push(cluster); // <-- ADD THIS LINE
+                            this.clusters.push(cluster);
                         } else if (p1.cluster && !p2.cluster) {
                             p1.cluster.addParticleNode(p2);
                         } else if (!p1.cluster && p2.cluster) {
@@ -506,7 +525,7 @@ class ArenaManager {
                         break;
                     }
 
-                    // Elastic rebound (if not stuck magnetically)
+                    // Elastic rebound factoring in varying mass (m1, m2)
                     const dist = Math.sqrt(distSq);
                     const nx = dx / dist;
                     const ny = dy / dist;
@@ -517,23 +536,24 @@ class ArenaManager {
                     p2.x += nx * overlap;
                     p2.y += ny * overlap;
 
+                    const m1 = p1.mass || 1.0;
+                    const m2 = p2.mass || 1.0;
+
                     const kx = p1.vx - p2.vx;
                     const ky = p1.vy - p2.vy;
-                    const p = kx * nx + ky * ny;
+                    const p = 2 * (nx * kx + ny * ky) / (m1 + m2);
 
-                    if (p > 0) {
-                        p1.vx -= p * nx;
-                        p1.vy -= p * ny;
-                        p2.vx += p * nx;
-                        p2.vy += p * ny;
-                    }
+                    p1.vx -= p * m2 * nx;
+                    p1.vy -= p * m2 * ny;
+                    p2.vx += p * m1 * nx;
+                    p2.vy += p * m1 * ny;
                 }
             }
         }
     }
 
     handleElectrostaticInteractions() {
-        const interactionRadius = 45; // Short-range cutoff distance
+        const interactionRadius = 45;
         const cutoffSq = interactionRadius * interactionRadius;
         const coulombConstant = 18000;
         const len = this.particles.length;
@@ -553,18 +573,19 @@ class ArenaManager {
                 if (distSq < cutoffSq && distSq > 16) {
                     const dist = Math.sqrt(distSq);
                     
-                    // Coulomb's Law (F = k * q1 * q2 / r^2)
-                    // Positive force = Repulsion (like charges), Negative force = Attraction (opposite charges)
                     const forceMagnitude = (coulombConstant * p1.chargeVal * p2.chargeVal) / distSq;
 
                     const fx = (dx / dist) * forceMagnitude;
                     const fy = (dy / dist) * forceMagnitude;
 
-                    // Impart equal and opposite acceleration forces
-                    p1.ax -= fx;
-                    p1.ay -= fy;
-                    p2.ax += fx;
-                    p2.ay += fy;
+                    // Apply acceleration inversely proportional to particle mass (a = F / m)
+                    const m1 = p1.mass || 1.0;
+                    const m2 = p2.mass || 1.0;
+
+                    p1.ax -= fx / m1;
+                    p1.ay -= fy / m1;
+                    p2.ax += fx / m2;
+                    p2.ay += fy / m2;
                 }
             }
         }
@@ -885,7 +906,6 @@ class DoublerModule extends ArenaModule {
     }
 
     affectParticle(particle, dt, arena) {
-        // Skip if particle has already been cloned by this module
         if (this.processedParticles.has(particle)) return;
 
         const c = this.center;
@@ -894,10 +914,8 @@ class DoublerModule extends ArenaModule {
         const distSq = dx * dx + dy * dy;
 
         if (distSq <= (this.radius * 0.7) ** 2) {
-            // Mark original particle as processed
             this.processedParticles.add(particle);
 
-            // Calculate slightly deflected velocity for the clone (+/- 15 degrees)
             const angle = (Math.random() - 0.5) * (Math.PI / 6);
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
@@ -905,26 +923,23 @@ class DoublerModule extends ArenaModule {
             const cloneVx = particle.vx * cos - particle.vy * sin;
             const cloneVy = particle.vx * sin + particle.vy * cos;
 
-            // Instantiate duplicate particle
             const clone = new Particle(
                 particle.x,
                 particle.y,
                 cloneVx,
                 cloneVy,
                 particle.charge,
-                particle.color
+                particle.color,
+                particle.radius,
+                particle.mass
             );
 
-            // Retain source metadata and anti-matter state
             clone.sourceId = particle.sourceId;
             clone.originHash = particle.originHash;
             clone.currentHash = particle.currentHash;
             clone.isAnti = particle.isAnti;
 
-            // Mark clone as processed so it doesn't trigger immediate duplicate loop inside same module
             this.processedParticles.add(clone);
-
-            // Add clone to active particle pool
             arena.addParticle(clone);
         }
     }

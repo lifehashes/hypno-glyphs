@@ -580,6 +580,9 @@
         <!-- Boundary Mode Selector Button -->
         <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>
 
+        <button class="help-btn" id="var-size-btn" onclick="toggleVariableSize()">VAR SIZE: OFF</button>
+        <button class="help-btn" id="var-mass-btn" onclick="toggleVariableMass()">VAR MASS: OFF</button>
+
         <!-- MATCH TIMEOUT & OVERTIME RESOLUTION SELECTORS -->
         <div style="display:flex; align-items:center; gap:6px; color:#fff; font-family:monospace; font-size:11px; margin-left: 8px;">
             <label for="timer-select">LIMIT:</label>
@@ -647,6 +650,30 @@
         const actualValue = sign * Math.pow(10, Math.abs(exp));
         
         updateGravity(actualValue);
+    }
+
+    // Toggle state tracking globals
+    window.variableSizeEnabled = false;
+    window.variableMassEnabled = false;
+
+    function toggleVariableSize() {
+        window.variableSizeEnabled = !window.variableSizeEnabled;
+        const btn = document.getElementById('var-size-btn');
+        if (btn) {
+            btn.innerText = `VAR SIZE: ${window.variableSizeEnabled ? 'ON' : 'OFF'}`;
+            btn.style.borderColor = window.variableSizeEnabled ? '#00ffff' : '';
+            btn.style.color = window.variableSizeEnabled ? '#00ffff' : '';
+        }
+    }
+
+    function toggleVariableMass() {
+        window.variableMassEnabled = !window.variableMassEnabled;
+        const btn = document.getElementById('var-mass-btn');
+        if (btn) {
+            btn.innerText = `VAR MASS: ${window.variableMassEnabled ? 'ON' : 'OFF'}`;
+            btn.style.borderColor = window.variableMassEnabled ? '#00ffff' : '';
+            btn.style.color = window.variableMassEnabled ? '#00ffff' : '';
+        }
     }
 
     function getRandomDatabaseGlyph() {
