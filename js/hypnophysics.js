@@ -530,6 +530,9 @@ class ArenaManager {
                 p.ay += this.globalGravityForce;
             }
 
+            // used to calculate drag (if enabled) as created by an infinitely fine medium
+            applyGlobalForces(p, dt);
+
             this.modules.forEach(mod => {
                 if (mod.affectParticle) {
                     mod.affectParticle(p, dt, this);
@@ -2103,4 +2106,30 @@ class OsmosisModule extends ArenaModule {
 
         ctx.restore();
     }
+}
+
+// Global or module-level state configuration
+let globalDragActive = false;
+let dragCoefficient = 0.5; // Adjustable range: 0.0 (none) to 2.0+ (heavy medium)
+
+function applyGlobalForces(particle, deltaTime) {
+
+    // Uniform Medium Drag Force: F = -b * v
+    if (globalDragActive) {
+        // Damping factor accounts for frame timing and particle mass
+        const dampingFactor = Math.exp(-(dragCoefficient / particle.mass) * deltaTime);
+        
+        particle.vx *= dampingFactor;
+        particle.vy *= dampingFactor;
+    }
+}
+
+// Global setters called by UI controls
+function toggleGlobalDrag() {
+    globalDragActive = !globalDragActive;
+    return globalDragActive;
+}
+
+function setDragCoefficient(val) {
+    dragCoefficient = parseFloat(val);
 }

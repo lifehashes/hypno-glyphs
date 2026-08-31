@@ -702,6 +702,7 @@
         <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">|&gt;</button>
         <button class="help-btn" id="edit-mode-btn" onclick="toggleEditMode()">EDIT MODE: OFF</button>
         <button class="help-btn" id="global-gravity-btn" onclick="toggleGlobalGravity()">GRAVITY DOWN: OFF</button>
+        <button id="btn-drag-toggle" class="help-btn" onclick="handleDragToggle()">MEDIUM DRAG: OFF</button>
         <button class="help-btn" id="forces-btn" onclick="toggleForcesModal()">FORCES</button>
         
         <!-- Boundary Mode Selector Button -->
@@ -773,6 +774,20 @@
             </div>
         </div>
 
+        <div class="forces-row">
+            <label for="drag-slider">Medium Viscosity (Drag Strength):</label>
+            <input 
+                type="range" 
+                id="drag-slider" 
+                min="0.05" 
+                max="3.0" 
+                step="0.05" 
+                value="0.5" 
+                oninput="updateDragVal(this.value)"
+            >
+            <span id="drag-val-display">0.50</span>
+        </div>
+
         <button class="help-btn" onclick="toggleForcesModal()" style="margin-top: 10px; width: 100%;">CLOSE</button>
     </div>
 </div>
@@ -814,6 +829,20 @@
         window.golTickInterval = val;
         tickLabel.textContent = val.toFixed(2);
     });
+
+    // GLOBAL DRAG
+
+    function handleDragToggle() {
+        const active = toggleGlobalDrag();
+        const btn = document.getElementById('btn-drag-toggle');
+        btn.innerText = `MEDIUM DRAG: ${active ? 'ON' : 'OFF'}`;
+        btn.classList.toggle('active', active);
+    }
+
+    function updateDragVal(val) {
+        document.getElementById('drag-val-display').innerText = parseFloat(val).toFixed(2);
+        setDragCoefficient(val);
+    }
 
     // Formats numbers into scientific notation with forced 1 decimal place (e.g. +1.0E+7, -1.0E-4, +0.0E+0)
     function formatSciExponent(value) {
