@@ -269,14 +269,6 @@
         </div>
     </div>
 
-    <!-- METRIC BARS CONTAINER -->
-    <div style="width: 100%; display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px;">
-        <!-- Top Bar: Scores (4px high) -->
-        <canvas id="score-bar-canvas" height="4" style="width: 100%; display: block;"></canvas>
-        <!-- Bottom Bar: Particle Count (2px high) -->
-        <canvas id="particle-bar-canvas" height="2" style="width: 100%; display: block;"></canvas>
-    </div>
-
     <div class="duel-stage">
         <!-- SOURCE MODULE ALPHA (PLAY MODE) -->
         <div class="player-box" id="alpha-panel">
@@ -462,6 +454,15 @@
 
         <!-- MAIN ARENA CANVAS -->
         <div class="arena-container">
+
+        <!-- METRIC BARS CONTAINER -->
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px;">
+            <!-- Top Bar: Scores (4px high) -->
+            <canvas id="score-bar-canvas" height="4" style="width: 100%; display: block;"></canvas>
+            <!-- Bottom Bar: Particle Count (2px high) -->
+            <canvas id="particle-bar-canvas" height="2" style="width: 100%; display: block;"></canvas>
+        </div>
+
             <div id="arena-timer" style="
                     position: absolute;
                     top: 12px;
@@ -947,9 +948,14 @@
     }
 
     function resizeCanvas() {
-        const rect = canvas.parentElement.getBoundingClientRect();
+        const arenaContainer = canvas.parentElement;
+        const rect = arenaContainer.getBoundingClientRect();
+        
+        // Account for the metric bars height and gap offset
+        const barsHeight = 12; 
+        
         canvas.width = rect.width;
-        canvas.height = rect.height;
+        canvas.height = rect.height - barsHeight;
 
         alphaEngine.resize();
         betaEngine.resize();

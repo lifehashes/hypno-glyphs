@@ -2018,12 +2018,23 @@ class BarVModule extends ArenaModule {
  * Osmosis Module
  * Semi-transparent permeable barrier. Solid wall for opposing particles; 
  * permeable pass-through for aligned particles of the matching side.
+ * Dynamically renders using the target lifeEngine's intrinsic color.
  */
 class OsmosisModule extends ArenaModule {
-    constructor(id, x, y, width = 80, height = 80, intrinsicColor = '#42f485', side = 'ALPHA') {
+    constructor(id, x, y, width = 80, height = 80, lifeEngine = null, side = 'ALPHA') {
         super(id, x, y, width, height, 'OSMOSIS');
-        this.intrinsicColor = intrinsicColor;
+        this.engine = lifeEngine; // Reference to GOL pattern engine
         this.side = side.toLowerCase();
+        
+        // Fallback color if lifeEngine isn't assigned or available
+        this.fallbackColor = side.toLowerCase().includes('alpha') ? '#42f485' : '#ff3366';
+    }
+
+    // Dynamic color getter matching SourceSpawnModule behavior
+    get color() {
+        return (this.engine && this.engine.intrinsicColor) 
+            ? this.engine.intrinsicColor 
+            : this.fallbackColor;
     }
 
     affectParticle(particle, dt) {
@@ -2067,24 +2078,26 @@ class OsmosisModule extends ArenaModule {
         super.draw(ctx);
         ctx.save();
 
-        // 1. Fill semi-transparent interior with intrinsic hue
-        ctx.fillStyle = this.intrinsicColor;
+        const activeColor = this.color;
+
+        // 1. Fill semi-transparent interior with dynamic intrinsic hue
+        ctx.fillStyle = activeColor;
         ctx.globalAlpha = 0.18;
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
-        // 2. Render dashed/solid border in intrinsic color
+        // 2. Render dashed/solid border in dynamic intrinsic color
         ctx.globalAlpha = 0.8;
-        ctx.strokeStyle = this.intrinsicColor;
+        ctx.strokeStyle = activeColor;
         ctx.lineWidth = 1.5;
         ctx.shadowBlur = 8;
-        ctx.shadowColor = this.intrinsicColor;
+        ctx.shadowColor = activeColor;
         ctx.setLineDash([6, 3]);
         ctx.strokeRect(this.x, this.y, this.width, this.height);
 
         // 3. Label text
         ctx.setLineDash([]);
         ctx.font = '9px monospace';
-        ctx.fillStyle = this.intrinsicColor;
+        ctx.fillStyle = activeColor;
         ctx.textAlign = 'center';
         ctx.fillText(`OSMOSIS [${this.side.toUpperCase()}]`, this.center.x, this.y + 12);
 
