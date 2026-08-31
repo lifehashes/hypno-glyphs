@@ -1209,6 +1209,7 @@ class CapacitorModule extends ArenaModule {
 /**
  * Kinetic Converter Module
  * Halves or doubles the velocity of particles passing through its zone.
+ * Enforces an arena-dependent speed limit when boosting to prevent frame-skipping/tunneling.
  * mode: 'double' | 'half' (or multiplier value like 2.0 / 0.5)
  */
 class KineticConverterModule extends ArenaModule {
@@ -1220,7 +1221,7 @@ class KineticConverterModule extends ArenaModule {
         this.activeParticles = new Set();
     }
 
-    affectParticle(particle, dt) {
+    affectParticle(particle, dt, arena) {
         const c = this.center;
         const dx = particle.x - c.x;
         const dy = particle.y - c.y;
@@ -1230,6 +1231,25 @@ class KineticConverterModule extends ArenaModule {
         if (inZone) {
             // Scale velocity once when entering the zone boundary
             if (!this.activeParticles.has(particle)) {
+                
+                // If boosting (multiplier > 1), verify speed limit before applying
+                if (this.multiplier > 1.0) {
+                    const currentSpeed = Math.hypot(particle.vx, particle.vy);
+                    const targetSpeed = currentSpeed * this.multiplier;
+
+                    // Calculate maximum speed so dist per tick (v * dt) < min arena length
+                    const canvas = arena ? arena.canvas : null;
+                    const minArenaDimension = canvas ? Math.min(canvas.width, canvas.height) : 800;
+                    const effectiveDt = dt > 0 ? dt : 0.016; // Fallback to ~60fps step
+                    const maxSpeedLimit = minArenaDimension / effectiveDt;
+
+                    // Abort boost if target speed exceeds maximum tick threshold
+                    if (targetSpeed > maxSpeedLimit) {
+                        this.activeParticles.add(particle);
+                        return;
+                    }
+                }
+
                 particle.vx *= this.multiplier;
                 particle.vy *= this.multiplier;
                 this.activeParticles.add(particle);
