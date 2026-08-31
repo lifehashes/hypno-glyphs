@@ -1,7 +1,12 @@
 class LifeEngine {
-    constructor(canvasId, gridSize) {
-        this.canvas = document.getElementById(canvasId);
-        this.ctx = this.canvas.getContext('2d');
+    constructor(canvasOrId, gridSize) {
+        // Handle canvas ID string, direct element reference, or null/undefined
+        this.canvas = typeof canvasOrId === 'string' 
+            ? document.getElementById(canvasOrId) 
+            : (canvasOrId || null);
+
+        // Safely retrieve context only if element exists
+        this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
 
         this.n = gridSize;
         this.grid = this.createGrid();
@@ -30,6 +35,8 @@ class LifeEngine {
     }
 
     resize() {
+        if (!this.canvas) return; // Guard against null canvas
+
         const parent = this.canvas.parentElement;
         const size = parent ? parent.clientWidth : 256;
         this.canvas.width = size;
@@ -171,6 +178,8 @@ class LifeEngine {
     }
 
     render() {
+        if (!this.ctx || !this.canvas) return; // Guard against headless instances
+
         const cellSize = this.canvas.width / this.n;
         const radius = (cellSize / 2) * 0.8;
         

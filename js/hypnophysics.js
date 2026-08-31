@@ -170,26 +170,27 @@ class ArenaModule {
 /**
  * 3. Source / Spawn Module (Emits particles based on live outer edge cells)
  */
-/**
- * 3. Source / Spawn Module (Emits particles based on live outer edge cells)
- */
 class SourceSpawnModule extends ArenaModule {
     constructor(id, x, y, width, height, lifeEngine, label = 'EMITTER') {
         super(id, x, y, width, height, 'SOURCE_SPAWN');
         this.engine = lifeEngine;
         this.label = label;
         this.stepTimer = 0;
-        this.stepInterval = 0.2;
     }
 
     affectParticle(particle, dt) {
-        // Cross-conversion rule: Particles entering an opposing source's box adopt its properties
-        if (particle.sourceId !== this.id) {
-            const inX = particle.x >= this.x && particle.x <= this.x + this.width;
-            const inY = particle.y >= this.y && particle.y <= this.y + this.height;
+        // Skip particles that already belong to this module
+        if (particle.sourceId === this.id) return;
 
-            if (inX && inY) {
-                particle.sourceId = this.id;
+        // Check AABB containment inside this spawner's boundaries
+        const insideX = particle.x >= this.x && particle.x <= this.x + this.width;
+        const insideY = particle.y >= this.y && particle.y <= this.y + this.height;
+
+        if (insideX && insideY) {
+            // Re-assign ownership properties
+            particle.sourceId = this.id;
+            
+            if (this.engine) {
                 particle.color = this.engine.intrinsicColor;
                 particle.originHash = this.engine.originHash;
                 particle.currentHash = this.engine.currentHash;
@@ -198,49 +199,52 @@ class SourceSpawnModule extends ArenaModule {
     }
 
     update(dt, arena) {
-        // Do not update or emit if engine has reached its terminal/halt state
-        if (!this.engine.isActive) return;
+        // Stop updating if inactive OR halted
+        if (!this.engine || !this.engine.isActive || this.engine.halted) return;
+
+        // Dynamic GOL Tick Interval
+        const currentInterval = (typeof window !== 'undefined' && window.golTickInterval !== undefined) 
+            ? window.golTickInterval 
+            : 0.2;
 
         this.stepTimer += dt;
-        if (this.stepTimer >= this.stepInterval) {
+        if (this.stepTimer >= currentInterval) {
             this.stepTimer = 0;
 
             const n = this.engine.n;
             const c = this.center;
             const color = this.engine.intrinsicColor;
-            const baseSpeed = 80;
 
-            // Compute size and mass deterministically using originHash characters[cite: 3]
+            const baseSpeed = (typeof window !== 'undefined' && window.initialSpawnVelocity !== undefined) 
+                ? window.initialSpawnVelocity 
+                : 80;
+
             const originHash = this.engine.originHash || '';
             const lastChar = originHash.length > 0 ? originHash.charAt(originHash.length - 1) : '0';
             const secondLastChar = originHash.length > 1 ? originHash.charAt(originHash.length - 2) : '0';
 
-            // Map hexadecimal char 0-f (0-15) to range 1-16
             const sizeValue = parseInt(lastChar, 16) % 16 + 1;
             const massValue = parseInt(secondLastChar, 16) % 16 + 1;
 
             const particleRadius = (typeof window !== 'undefined' && window.variableSizeEnabled) ? sizeValue : 2.5;
             const particleMass = (typeof window !== 'undefined' && window.variableMassEnabled) ? massValue : 1.0;
 
-            // Iterate over the grid to locate outer edge live cells
             for (let y = 0; y < n; y++) {
                 for (let x = 0; x < n; x++) {
                     const isEdge = (x === 0 || x === n - 1 || y === 0 || y === n - 1);
                     
                     if (isEdge && this.engine.grid[y][x] === 1) {
-                        // Calculate offset coordinates mapped to module box bounds
-                        const offsetX = (x / (n - 1) - 0.5) * this.width;
-                        const offsetY = (y / (n - 1) - 0.5) * this.height;
+                        // Match draw padding (inset by 8px so spawn matches preview positions)
+                        const offsetX = (x / (n - 1) - 0.5) * (this.width - 8);
+                        const offsetY = (y / (n - 1) - 0.5) * (this.height - 8);
 
                         const spawnX = c.x + offsetX;
                         const spawnY = c.y + offsetY;
 
-                        // Calculate outward direction vector away from module center
                         let dx = spawnX - c.x;
                         let dy = spawnY - c.y;
                         let dist = Math.sqrt(dx * dx + dy * dy);
 
-                        // Fallback vector for exact center corner cases
                         if (dist === 0) {
                             dx = 1;
                             dy = 0;
@@ -250,7 +254,6 @@ class SourceSpawnModule extends ArenaModule {
                         const vx = (dx / dist) * baseSpeed;
                         const vy = (dy / dist) * baseSpeed;
 
-                        // Emit particle with dynamic or default radius and mass
                         const p = new Particle(spawnX, spawnY, vx, vy, 0, color, particleRadius, particleMass);
                         p.sourceId = this.id;
                         p.originHash = this.engine.originHash;
@@ -261,7 +264,6 @@ class SourceSpawnModule extends ArenaModule {
                 }
             }
 
-            // Advance state
             this.engine.computeNextGeneration();
         }
     }
@@ -269,27 +271,62 @@ class SourceSpawnModule extends ArenaModule {
     draw(ctx) {
         super.draw(ctx);
         const c = this.center;
+        const color = this.engine ? this.engine.intrinsicColor : '#42f485';
+
         ctx.save();
-        ctx.strokeStyle = this.engine.intrinsicColor;
-        ctx.fillStyle = this.engine.intrinsicColor;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = this.engine.intrinsicColor;
 
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, 6, 0, Math.PI * 2);
+        const isHalted = this.engine && this.engine.halted;
 
-        // Filled dot while active, hollow ring shell when halted/inactive
-        if (this.engine.isActive) {
+        // Central Core Rendering
+        if (!isHalted) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 4, 0, Math.PI * 2);
             ctx.fill();
         } else {
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "rgba(100, 100, 100, 0.3)"; 
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 2, 0, Math.PI * 2);
+            ctx.fill();
         }
 
+        // GOL Cell Previews
+        if (this.engine && this.engine.grid) {
+            const n = this.engine.n;
+            ctx.shadowBlur = isHalted ? 0 : 4; // Kill preview glow when halted
+            ctx.fillStyle = isHalted ? "rgba(100, 100, 100, 0.2)" : color;
+            ctx.strokeStyle = isHalted ? "rgba(100, 100, 100, 0.2)" : color;
+            ctx.lineWidth = 1;
+
+            for (let y = 0; y < n; y++) {
+                for (let x = 0; x < n; x++) {
+                    if (this.engine.grid[y][x] === 1) {
+                        const offsetX = (x / (n - 1) - 0.5) * (this.width - 8);
+                        const offsetY = (y / (n - 1) - 0.5) * (this.height - 8);
+
+                        const cellX = c.x + offsetX;
+                        const cellY = c.y + offsetY;
+                        const isEdge = (x === 0 || x === n - 1 || y === 0 || y === n - 1);
+
+                        if (isEdge) {
+                            ctx.fillRect(cellX - 1.5, cellY - 1.5, 3, 3);
+                        } else {
+                            ctx.strokeRect(cellX - 1.5, cellY - 1.5, 3, 3);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Module Label
         ctx.font = '9px monospace';
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fillStyle = isHalted ? "rgba(100, 100, 100, 0.5)" : color;
         ctx.textAlign = 'center';
         ctx.fillText(this.label, c.x, this.y + 12);
+
         ctx.restore();
     }
 }

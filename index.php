@@ -55,6 +55,31 @@
     <link rel="stylesheet" href="styles.css">
     <style>
 
+        /* Centered Side Panel Headings */
+        .pane-title {
+            text-align: center;
+            font-size: 11px;
+            letter-spacing: 1.5px;
+        }
+
+        /* Centered Designation Display */
+        .designation-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 4px 0 6px 0;
+            gap: 2px;
+        }
+
+        .designation-title {
+            font-size: 16px;
+            font-weight: bold;
+            font-family: monospace;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
         /* Palette Container Sidebar */
         .editor-palette-box {
             display: none; /* Toggled via JS */
@@ -112,6 +137,125 @@
             letter-spacing: 0.5px;
         }
 
+        /* Forces Control Modal */
+        .forces-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            z-index: 99;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .forces-modal.active {
+            display: flex;
+        }
+
+        .forces-card {
+            background: rgba(15, 20, 30, 0.95);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            border-radius: 6px;
+            padding: 20px;
+            width: 340px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .forces-header {
+            font-family: monospace;
+            font-size: 14px;
+            color: #00ffff;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+            padding-bottom: 8px;
+        }
+
+        .forces-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            color: #fff;
+            font-family: monospace;
+            font-size: 11px;
+        }
+
+        .forces-row-label {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* TERMINAL SLIDER RESTYLING */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #1a1e24;
+            border-radius: 0px;
+            outline: none;
+            margin: 10px 0;
+            /* Soft glowing green rail line */
+            box-shadow: 0 0 8px rgba(66, 244, 133, 0.4), 0 0 2px rgba(66, 244, 133, 0.8);
+            border: 1px solid rgba(66, 244, 133, 0.2);
+            cursor: pointer;
+        }
+
+        /* Chrome, Safari, Edge, Opera - Slider Thumb */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 18px;
+            background: #090c10;
+            border: 1.5px solid #42f485;
+            border-radius: 0px;
+            box-shadow: 0 0 6px rgba(66, 244, 133, 0.6);
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #42f485;
+            box-shadow: 0 0 12px #42f485;
+        }
+
+        /* Firefox - Slider Track */
+        input[type="range"]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            background: #1a1e24;
+            border-radius: 0px;
+            box-shadow: 0 0 8px rgba(66, 244, 133, 0.4), 0 0 2px rgba(66, 244, 133, 0.8);
+            border: 1px solid rgba(66, 244, 133, 0.2);
+        }
+
+        /* Firefox - Slider Thumb */
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 18px;
+            background: #090c10;
+            border: 1.5px solid #42f485;
+            border-radius: 0px;
+            box-shadow: 0 0 6px rgba(66, 244, 133, 0.6);
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            background: #42f485;
+            box-shadow: 0 0 12px #42f485;
+        }
+
     </style>
 </head>
 <body>
@@ -137,13 +281,11 @@
         <!-- SOURCE MODULE ALPHA (PLAY MODE) -->
         <div class="player-box" id="alpha-panel">
             <div class="pane-title">SOURCE :: ALPHA</div>
-            <div class="glyph-preview">
-                <canvas id="glyph-alpha-canvas" width="80" height="80"></canvas>
+            
+            <div class="designation-header">
+                <span class="designation-title" id="alpha-name" style="color: #42f485;">P_56_10</span>
             </div>
-            <div class="stat-line">
-                <span>DESIGNATION:</span>
-                <span class="stat-value" id="alpha-name">P_56_10</span>
-            </div>
+
             <div class="stat-line">
                 <span>OWNER:</span>
                 <span class="stat-value" id="alpha-owner" style="color: #00ffff;">-</span>
@@ -176,7 +318,7 @@
                 <button class="load-btn" style="flex:1;" onclick="loadRandomSeed('alpha')">RANDOM SEED</button>
                 <button class="load-btn" style="flex:1; background:rgba(0, 255, 255, 0.15); border-color:#00ffff;" onclick="loadDatabaseGlyph('alpha')">DB DRAW</button>
             </div>
-            <!-- NEW: Graph Strip Canvas under buttons -->
+            <!-- Graph Strip Canvas under buttons -->
             <canvas id="alpha-graph-canvas" height="30" style="width: 100%; height: 30px; display: block; margin-top: 6px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
 
             <div style="font-size: 9px; color: #888; margin-top: 6px;">SPEED DISTRIBUTION</div>
@@ -403,13 +545,11 @@
         <!-- SOURCE MODULE BETA -->
         <div class="player-box" id="beta-panel">
             <div class="pane-title">SOURCE :: BETA</div>
-            <div class="glyph-preview">
-                <canvas id="glyph-beta-canvas" width="80" height="80"></canvas>
+            
+            <div class="designation-header">
+                <span class="designation-title" id="beta-name" style="color: #42f485;">P_56_10</span>
             </div>
-            <div class="stat-line">
-                <span>DESIGNATION:</span>
-                <span class="stat-value" id="beta-name">P_56_10</span>
-            </div>
+
             <div class="stat-line">
                 <span>OWNER:</span>
                 <span class="stat-value" id="beta-owner" style="color: #00ffff;">-</span>
@@ -442,7 +582,7 @@
                 <button class="load-btn" style="flex:1;" onclick="loadRandomSeed('beta')">RANDOM SEED</button>
                 <button class="load-btn" style="flex:1; background:rgba(0, 255, 255, 0.15); border-color:#00ffff;" onclick="loadDatabaseGlyph('beta')">DB DRAW</button>
             </div>
-            <!-- NEW: Graph Strip Canvas under buttons -->
+            <!-- Graph Strip Canvas under buttons -->
             <canvas id="beta-graph-canvas" height="30" style="width: 100%; height: 30px; display: block; margin-top: 6px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;"></canvas>
         
             <div style="font-size: 9px; color: #888; margin-top: 6px;">SPEED DISTRIBUTION</div>
@@ -561,22 +701,8 @@
         <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">|&gt;</button>
         <button class="help-btn" id="edit-mode-btn" onclick="toggleEditMode()">EDIT MODE: OFF</button>
         <button class="help-btn" id="global-gravity-btn" onclick="toggleGlobalGravity()">GRAVITY DOWN: OFF</button>
+        <button class="help-btn" id="forces-btn" onclick="toggleForcesModal()">FORCES</button>
         
-        <!-- Gravity Slider -->
-        <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
-            <label for="gravity-slider">GRAVITY WELL:</label>
-            <!-- Range represents the EXPONENT directly: -9 to +9 with 0 in the middle -->
-            <input type="range" id="gravity-slider" min="-9" max="9" step="0.1" value="4" oninput="updateGravityFromExponent(this.value)">
-            <span id="gravity-val">+1.0E+4</span>
-        </div>
-
-        <!-- Capacitor Strength Slider -->
-        <div style="display:flex; align-items:center; gap:10px; color:#fff; font-family:monospace; font-size:11px;">
-            <label for="capacitor-slider">CAPACITOR FORCE:</label>
-            <input type="range" id="capacitor-slider" min="0" max="1000000000" step="10000000" value="1000000" oninput="updateCapacitorStrength(this.value)">
-            <span id="capacitor-val">+1.0E+6</span>
-        </div>
-
         <!-- Boundary Mode Selector Button -->
         <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>
 
@@ -604,6 +730,52 @@
     </div>
 </div>
 
+<!-- FORCES CONTROL MODAL -->
+<div id="forces-modal" class="forces-modal">
+    <div class="forces-card">
+        <div class="forces-header">
+            <span>PHYSICS FORCES</span>
+            <button class="help-btn" onclick="toggleForcesModal()" style="padding: 2px 6px;">X</button>
+        </div>
+        
+        <!-- Gravity Slider -->
+        <div class="forces-row">
+            <div class="forces-row-label">
+                <label for="gravity-slider">GRAVITY WELL:</label>
+                <span id="gravity-val">+1.0E+4</span>
+            </div>
+            <input type="range" id="gravity-slider" min="-9" max="9" step="0.1" value="4" oninput="updateGravityFromExponent(this.value)">
+        </div>
+
+        <!-- Capacitor Strength Slider -->
+        <div class="forces-row">
+            <div class="forces-row-label">
+                <label for="capacitor-slider">CAPACITOR FORCE:</label>
+                <span id="capacitor-val">+1.0E+6</span>
+            </div>
+            <input type="range" id="capacitor-slider" min="0" max="1000000000" step="10000000" value="1000000" oninput="updateCapacitorStrength(this.value)">
+        </div>
+
+        <!-- Initial Velocity Slider -->
+        <div class="forces-row">
+            <div class="forces-row-label">
+                <label for="velocitySlider">Initial Particle Velocity: <span id="velocityVal">80</span></label>
+                <input type="range" id="velocitySlider" min="0" max="400" step="5" value="80">
+            </div>
+        </div>
+
+        <!-- GOL Tick Interval Slider -->
+        <div class="forces-row">
+            <div class="forces-row-label">
+                <label for="golTickSlider">GOL Tick Interval (s): <span id="golTickVal">0.20</span>s</label>
+                <input type="range" id="golTickSlider" min="0.02" max="1.0" step="0.01" value="0.20">
+            </div>
+        </div>
+
+        <button class="help-btn" onclick="toggleForcesModal()" style="margin-top: 10px; width: 100%;">CLOSE</button>
+    </div>
+</div>
+
 <script>
     const databaseGlyphs = <?php echo json_encode($myGlyphs ?: []); ?>;
     const canvas = document.getElementById('physics-canvas');
@@ -613,10 +785,34 @@
     let lastTimerTick = performance.now();
     let timerExpired = false;
 
-    const alphaEngine = new LifeEngine('glyph-alpha-canvas', 16);
-    const betaEngine  = new LifeEngine('glyph-beta-canvas', 16);
+    // Canvas arguments removed as preview canvases are dropped
+    const alphaEngine = new LifeEngine(null, 16);
+    const betaEngine  = new LifeEngine(null, 16);
     const arena       = new ArenaManager('physics-canvas');
     const scores = { alphaScore: 0, betaScore: 0 };
+
+    // Global Defaults
+    window.initialSpawnVelocity = 80;
+    window.golTickInterval = 0.2;
+
+    // Slider Event Listeners
+    const velSlider = document.getElementById('velocitySlider');
+    const velLabel = document.getElementById('velocityVal');
+
+    velSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        window.initialSpawnVelocity = val;
+        velLabel.textContent = val;
+    });
+
+    const tickSlider = document.getElementById('golTickSlider');
+    const tickLabel = document.getElementById('golTickVal');
+
+    tickSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        window.golTickInterval = val;
+        tickLabel.textContent = val.toFixed(2);
+    });
 
     // Formats numbers into scientific notation with forced 1 decimal place (e.g. +1.0E+7, -1.0E-4, +0.0E+0)
     function formatSciExponent(value) {
@@ -636,6 +832,18 @@
         const formattedMantissa = mantissa.toFixed(1);
 
         return `${sign}${formattedMantissa}E${expSign}${absExp}`;
+    }
+
+    function toggleForcesModal() {
+        const modal = document.getElementById('forces-modal');
+        const btn = document.getElementById('forces-btn');
+        modal.classList.toggle('active');
+        
+        const isActive = modal.classList.contains('active');
+        if (btn) {
+            btn.style.borderColor = isActive ? '#00ffff' : '';
+            btn.style.color = isActive ? '#00ffff' : '';
+        }
     }
 
     function updateGravityFromExponent(expVal) {
@@ -1610,16 +1818,6 @@
             btn.classList.add('pulse-green');
         }
 
-        // Copy live preview canvases to scorecard canvases
-        const srcAlphaCvs = document.getElementById('glyph-alpha-canvas');
-        const srcBetaCvs  = document.getElementById('glyph-beta-canvas');
-        
-        const dstAlphaCvs = document.getElementById('scorecard-alpha-preview');
-        const dstBetaCvs  = document.getElementById('scorecard-beta-preview');
-
-        dstAlphaCvs.getContext('2d').drawImage(srcAlphaCvs, 0, 0, 64, 64);
-        dstBetaCvs.getContext('2d').drawImage(srcBetaCvs, 0, 0, 64, 64);
-
         // Populate designations, owners, generations & scores
         document.getElementById('scorecard-alpha-name').innerText  = document.getElementById('alpha-name').innerText;
         document.getElementById('scorecard-alpha-owner').innerText = document.getElementById('alpha-owner').innerText;
@@ -1662,18 +1860,16 @@
     function updateGlyphColorStyling(source, color) {
         const prefix = source === 'alpha' ? 'alpha' : 'beta';
         
-        // Update color text readout
+        // Update color text readout & designation text color
         const colorElem = document.getElementById(`${prefix}-color`);
+        const nameElem  = document.getElementById(`${prefix}-name`);
+
         if (colorElem) {
             colorElem.style.color = color;
             colorElem.innerText = color.toUpperCase();
         }
-
-        // Update canvas preview container border & glow box-shadow
-        const previewContainer = document.querySelector(`#${prefix}-panel .glyph-preview`);
-        if (previewContainer) {
-            previewContainer.style.borderColor = color;
-            previewContainer.style.boxShadow = `0 0 14px ${color}80, inset 0 0 6px ${color}40`;
+        if (nameElem) {
+            nameElem.style.color = color;
         }
     }
 
