@@ -449,6 +449,15 @@
                     </svg>
                     <span>MAGNETIZER</span>
                 </div>
+                <!-- PREDATOR MODULE -->
+                <div class="palette-card" draggable="true" data-type="PREDATOR">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="11" stroke="#ff0055" stroke-width="1.5" stroke-dasharray="2 2" fill="none"/>
+                        <path d="M10 10 L22 22 M22 10 L10 22" stroke="#ff0055" stroke-width="2"/>
+                        <circle cx="16" cy="16" r="3" fill="#ff0055"/>
+                    </svg>
+                    <span>PREDATOR</span>
+                </div>
             </div>
         </div>
 
@@ -1310,7 +1319,9 @@
             case 'OSMOSIS_ALPHA':
                 return new OsmosisModule(id, x, y, width, height, alphaEngine.intrinsicColor, 'ALPHA');
             case 'OSMOSIS_BETA':
-                return new OsmosisModule(id, x, y, width, height, betaEngine.intrinsicColor, 'BETA');                
+                return new OsmosisModule(id, x, y, width, height, betaEngine.intrinsicColor, 'BETA');   
+            case 'PREDATOR':
+                return new PredatorModule(id, x, y, width, height);             
             default:
                 return null;
         }

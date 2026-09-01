@@ -3,7 +3,7 @@
  * Simple physical entities that move through the arena.
  */
 class Particle {
-    constructor(x, y, vx, vy, charge = 1, color = '#ffffff', radius = 2.5, mass = 1.0) {
+    constructor(x, y, vx, vy, charge = 1, color = '#ffffff', radius = 2.5, mass = 1.0, isPredator = false) {
         // Core spatial & physical properties
         this.x = x;
         this.y = y;
@@ -31,6 +31,12 @@ class Particle {
         // Tracked state & radar pulse properties
         this.isTracked = false;
         this.pulseTimer = 0;
+
+        // Track Predator status
+        this.isPredator = isPredator;
+        this.life = 1.0;
+        this.dead = false;        
+
     }
 
     update(dt) {
@@ -41,6 +47,17 @@ class Particle {
 
         this.ageSeconds += dt;
         this.ageShakes = Math.floor(this.ageSeconds / 10);
+
+        // Lifespan & Expiration Logic (Only applies to Predators)
+        if (this.isPredator) {
+            const lifeDecayRate = 0.05; // 0.15/sec = ~6.6 seconds default lifespan
+            this.chargeVal = 0;
+            this.life = Math.max(0, this.life - lifeDecayRate * dt);
+
+            if (this.life <= 0) {
+                this.dead = true;
+            }
+        }
 
         // Update pulse timer (cycles every 1.2 seconds)
         if (this.isTracked) {
@@ -84,41 +101,91 @@ class Particle {
             ctx.restore();
         }
 
-        // Standard Particle Drawing
         ctx.save();
-        ctx.globalAlpha = this.life ?? 1.0; // Fallback ensures visibility
-        ctx.strokeStyle = this.color;
-        ctx.fillStyle = this.color;
-        ctx.shadowBlur = 6;
-        ctx.shadowColor = this.color;
+        ctx.globalAlpha = Math.max(0, Math.min(1, this.life)); // Opacity bound to life
 
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        // ==========================================
+        // PREDATOR SPECIFIC RENDERING ROUTINE
+        // ==========================================
+        if (this.isPredator) {
+            const headingAngle = Math.atan2(this.vy, this.vx);
+            const predatorColor = this.color || '#ff0055';
 
-        if (this.isAnti) {
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-        } else {
-            ctx.fill();
-        }
-
-        // Concentric charge rings
-        const numRings = Math.abs(this.chargeVal);
-        if (numRings > 0) {
             ctx.save();
             ctx.translate(this.x, this.y);
-            ctx.rotate(this.ringRotation);
-            ctx.shadowBlur = 0;
-            ctx.lineWidth = 0.8;
-            ctx.strokeStyle = this.chargeVal > 0 ? '#00e1ff' : '#ff3366';
+            ctx.rotate(headingAngle);
 
-            for (let r = 1; r <= numRings; r++) {
-                const ringRadius = this.radius + 1.0 + r * 2.2;
-                ctx.beginPath();
-                ctx.arc(0, 0, ringRadius, 0, Math.PI * 1.5);
-                ctx.stroke();
+            // Glowing Outer Danger Aura
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = predatorColor;
+            ctx.fillStyle = predatorColor;
+            ctx.strokeStyle = '#ffffff';
+
+            // Jagged Spike/Teeth Body Contour
+            ctx.beginPath();
+            const teethCount = 6;
+            for (let i = 0; i < teethCount; i++) {
+                const a1 = (i / teethCount) * Math.PI * 2;
+                const a2 = ((i + 0.5) / teethCount) * Math.PI * 2;
+                const rOuter = this.radius * 2.5;
+                const rInner = this.radius * 1.5;
+
+                ctx.lineTo(Math.cos(a1) * rOuter, Math.sin(a1) * rOuter);
+                ctx.lineTo(Math.cos(a2) * rInner, Math.sin(a2) * rInner);
             }
+            ctx.closePath();
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Directional Glowing Eye Spots
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(this.radius * 0.4, -this.radius * 0.4, 1.5, 0, Math.PI * 2);
+            ctx.arc(this.radius * 0.4, this.radius * 0.4, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.restore();
+        } 
+        // ==========================================
+        // STANDARD PARTICLE DRAWING ROUTINE
+        // ==========================================
+        else {
+            ctx.strokeStyle = this.color;
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = this.color;
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+
+            if (this.isAnti) {
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+            } else {
+                ctx.fill();
+            }
+
+            // Concentric charge rings
+            const numRings = Math.abs(this.chargeVal);
+            if (numRings > 0) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.ringRotation);
+                ctx.shadowBlur = 0;
+                ctx.lineWidth = 0.8;
+                ctx.strokeStyle = this.chargeVal > 0 ? '#00e1ff' : '#ff3366';
+
+                for (let r = 1; r <= numRings; r++) {
+                    const ringRadius = this.radius + 1.0 + r * 2.2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, ringRadius, 0, Math.PI * 1.5);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
         }
 
         ctx.restore();
@@ -595,6 +662,41 @@ class ArenaManager {
 
                 if (distSq < minDistSq && distSq > 0) {
                     
+                    // ==========================================
+                    // PREDATOR INTERACTION & FEEDING LOGIC
+                    // ==========================================
+                    if (p1.isPredator || p2.isPredator) {
+                        // Skip collision response if both are predators of the same species
+                        if (p1.isPredator && p2.isPredator && p1.sourceId === p2.sourceId) {
+                            continue;
+                        }
+
+                        // Determine predator and prey roles for cross-species interactions
+                        let predator = null;
+                        let prey = null;
+
+                        if (p1.isPredator && p2.sourceId !== p1.sourceId) {
+                            predator = p1;
+                            prey = p2;
+                        } else if (p2.isPredator && p1.sourceId !== p2.sourceId) {
+                            predator = p2;
+                            prey = p1;
+                        }
+
+                        // Execute feeding logic: consume prey and restore life
+                        if (predator && prey) {
+                            prey.dead = true;
+                            predator.life = Math.min(1.0, predator.life + 0.35); // Replenish life up to 100%
+
+                            if (prey.cluster) prey.cluster.shatter(this);
+
+                            const feedX = (p1.x + p2.x) / 2;
+                            const feedY = (p1.y + p2.y) / 2;
+                            this.effects.push(new ExplosionFlash(feedX, feedY, 15, predator.color));
+                            continue;
+                        }
+                    }
+
                     // MAGNETIC CLUSTER STICKING / SHATTERING
                     if (p1.isMagnetic && p2.isMagnetic) {
                         if (!p1.cluster && !p2.cluster) {
@@ -2132,4 +2234,78 @@ function toggleGlobalDrag() {
 
 function setDragCoefficient(val) {
     dragCoefficient = parseFloat(val);
+}
+
+/**
+ * Predator Module
+ * Transforms standard particles entering its boundary into predators.
+ */
+class PredatorModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 80) {
+        super(id, x, y, width, height, 'PREDATOR');
+        this.radius = Math.min(width, height) / 2;
+        this.activeParticles = new Set();
+    }
+
+    affectParticle(particle, dt) {
+        // Skip particles that are already predators
+        if (particle.isPredator) return;
+
+        const c = this.center;
+        const dx = particle.x - c.x;
+        const dy = particle.y - c.y;
+        const distSq = dx * dx + dy * dy;
+        const inZone = distSq <= (this.radius * 0.7) ** 2;
+
+        if (inZone) {
+            // Convert to predator on entry into the module zone
+            if (!this.activeParticles.has(particle)) {
+                particle.isPredator = true;
+                particle.life = 1.0; // Initialize with full lifespan/health
+                this.activeParticles.add(particle);
+            }
+        } else {
+            // Clean up tracking when the particle leaves the module area
+            this.activeParticles.delete(particle);
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        const predatorColor = '#ff0055';
+
+        ctx.save();
+        ctx.strokeStyle = predatorColor;
+        ctx.fillStyle = predatorColor;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = predatorColor;
+        ctx.lineWidth = 1.5;
+
+        // Circular active zone indicator
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, this.radius * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Jagged teeth icon in center
+        ctx.beginPath();
+        const teethCount = 5;
+        const outerR = 10;
+        const innerR = 5;
+        for (let i = 0; i < teethCount; i++) {
+            const a1 = (i / teethCount) * Math.PI * 2;
+            const a2 = ((i + 0.5) / teethCount) * Math.PI * 2;
+            ctx.lineTo(c.x + Math.cos(a1) * outerR, c.y + Math.sin(a1) * outerR);
+            ctx.lineTo(c.x + Math.cos(a2) * innerR, c.y + Math.sin(a2) * innerR);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Module Label
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('PREDATOR', c.x, this.y + 12);
+
+        ctx.restore();
+    }
 }
