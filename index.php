@@ -51,7 +51,8 @@
     <title>HYPNOGLYPHS // GENERATIVE PHYSICS ENGINE</title>
     <SCRIPT SRC="js/gol.js"></SCRIPT>
     <SCRIPT SRC="js/hypnophysics.js"></SCRIPT>
-    <SCRIPT SRC="js/sha256.js"></SCRIPT>	
+    <SCRIPT SRC="js/sha256.js"></SCRIPT>
+    <SCRIPT SRC="js/tournament.js"></SCRIPT>	
     <link rel="stylesheet" href="styles.css">
     <style>
 
@@ -254,6 +255,210 @@
         input[type="range"]::-moz-range-thumb:hover {
             background: #42f485;
             box-shadow: 0 0 12px #42f485;
+        }
+
+        /* Reusing Score Card overlay styling principles */
+        .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(10, 10, 18, 0.85);
+        backdrop-filter: blur(8px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.hidden {
+        display: none;
+        opacity: 0;
+        pointer-events: none;
+        }
+
+        .tournament-card {
+        width: 90%;
+        max-width: 1100px;
+        max-height: 85vh;
+        background: #12131c;
+        border: 1px solid #2a2d42;
+        border-radius: 8px;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 229, 255, 0.15);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        }
+
+        /* Bracket Tree Grid (CSS Columns for Rounds) */
+        .bracket-tree-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: stretch;
+        gap: 12px;
+        padding: 20px;
+        overflow-x: auto;
+        min-height: 420px;
+        }
+
+        .bracket-column {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        flex: 1;
+        min-width: 140px;
+        }
+
+        .bracket-column.center-final {
+        justify-content: center;
+        }
+
+        .bracket-round {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        flex: 1;
+        min-width: 180px;
+        }
+
+        /* Individual Matchup Nodes */
+        .matchup-card {
+        background: #141722;
+        border: 1px solid #2a2d42;
+        border-radius: 4px;
+        padding: 6px;
+        margin: 6px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        }
+
+        .matchup-card.active-match {
+        border-color: #00e5ff;
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+
+        .matchup-slot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 6px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 2px;
+        font-family: monospace;
+        font-size: 11px;
+        color: #888;
+        }
+
+        .matchup-slot.filled {
+        color: #00ffff;
+        }
+
+        .matchup-slot.placeholder {
+        color: #444a63;
+        font-style: italic;
+        }
+
+        .matchup-slot.winner {
+        color: #00ff88;
+        font-weight: bold;
+        }
+
+        .matchup-slot.loser {
+        color: #666;
+        text-decoration: line-through;
+        }
+
+        .help-select {
+            background:#0f141e; 
+            color:#00ffff; 
+            border:1px solid rgba(0,255,255,0.3); 
+            padding:3px 6px; 
+            font-family:monospace; 
+            font-size:11px; 
+            border-radius:3px; 
+            cursor:pointer;
+        }
+
+        .slot-info {
+        display: flex;
+        flex-direction: column;
+        text-align: left;
+        }
+
+        .slot-name {
+        font-weight: bold;
+        font-size: 0.9em;
+        text-shadow: 0 0 4px rgba(255, 255, 255, 0.2), 0 0 8px currentColor;
+        }
+
+        .slot-meta {
+        font-size: 0.7em;
+        opacity: 0.75;
+        color: #a0a0a0;
+        }
+
+        /* Modal Header Positioning & Alignment */
+        .modal-header {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px 20px 8px 20px;
+        }
+
+        /* Center Modal Title and Subtitle */
+        .modal-header h2,
+        #tourneySetupView .subtitle {
+            text-align: center;
+            margin: 0 auto;
+        }
+
+        #tourneySetupView .subtitle {
+            margin-top: 6px;
+            margin-bottom: 12px;
+        }
+
+        /* Position Exit Button to Top Right Corner */
+        .modal-header .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        /* Center Setup Controls Bar */
+        .setup-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        /* Center Bracket View Footer Controls */
+        .tourney-footer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding-bottom: 16px;
+        }
+
+        .tourney-footer .status-msg {
+            text-align: center;
         }
 
     </style>
@@ -710,6 +915,7 @@
         <button class="help-btn" onclick="clearArena()">&lt;|</button>
         <button class="start-btn pulse-green" id="sim-btn" onclick="toggleSimulation()">|&gt;</button>
         <button class="help-btn" id="edit-mode-btn" onclick="toggleEditMode()">EDIT MODE: OFF</button>
+        <button id="openTourneyModalBtn" class="help-btn">🏆 Tournament</button>
         <button class="help-btn" id="global-gravity-btn" onclick="toggleGlobalGravity()">GRAVITY DOWN: OFF</button>
         <button id="btn-drag-toggle" class="help-btn" onclick="handleDragToggle()">MEDIUM DRAG: OFF</button>
         <button class="help-btn" id="forces-btn" onclick="toggleForcesModal()">FORCES</button>
@@ -732,7 +938,7 @@
             </select>
             
             <label for="action-select" style="margin-left:4px;">TRIGGER:</label>
-            <select id="action-select" style="background:#0f141e; color:#00ffff; border:1px solid rgba(0,255,255,0.3); padding:3px 6px; font-family:monospace; font-size:11px; border-radius:3px; cursor:pointer;">
+            <select id="action-select" class="help-select">
                 <option value="GRAVITY">MAX GRAVITY</option>
                 <option value="GEOMETRY">NO BOUNDARIES</option>
                 <option value="DESTROY_ALL">DESTROY ALL</option>
@@ -1919,7 +2125,141 @@
         }
     }
 
+    /*
+    ********************
+    TOURNAMENT LOGIC
+    ********************
+    */
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+        initGlyphPool(databaseGlyphs);
+
+        const tourneyModal = document.getElementById('tournamentModal');
+        const openBtn = document.getElementById('openTourneyModalBtn');
+        const closeBtn = document.getElementById('closeTourneyModalBtn');
+
+        // Open Modal
+        if (openBtn && tourneyModal) {
+            openBtn.addEventListener('click', () => {
+            tourneyModal.classList.remove('hidden');
+            });
+        }
+
+        // Close Modal via Close Button
+        if (closeBtn && tourneyModal) {
+            closeBtn.addEventListener('click', () => {
+            tourneyModal.classList.add('hidden');
+            });
+        }
+
+        // Close Modal by clicking outside the card
+        if (tourneyModal) {
+            tourneyModal.addEventListener('click', (e) => {
+            if (e.target === tourneyModal) {
+                tourneyModal.classList.add('hidden');
+            }
+            });
+        }
+
+        initBracketGenerator();
+
+    });
+
+    // State tracking for selected tournament size
+    let selectedParticipantCount = 8;
+
+    function initBracketGenerator() {
+    const sizeSelect = document.getElementById('tourneySizeSelect');
+    if (sizeSelect) {
+        selectedParticipantCount = parseInt(sizeSelect.value, 10);
+        
+        // Re-render empty bracket whenever size changes
+        sizeSelect.addEventListener('change', (e) => {
+        selectedParticipantCount = parseInt(e.target.value, 10);
+        renderEmptyBracket(selectedParticipantCount);
+        });
+    }
+
+    // Initial render on page load
+    renderEmptyBracket(selectedParticipantCount);
+    }
+
+    function renderEmptyBracket(participantCount) {
+    const container = document.getElementById('bracketTreeContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+
+    // Determine rounds needed (4 count = 2 rounds, 8 count = 3 rounds, 16 count = 4 rounds)
+    const totalRounds = Math.log2(participantCount);
+    
+    // Build symmetrical column layout structure
+    // Left side columns (Round 1 up to Semi-Finals)
+    const leftColumns = [];
+    // Right side columns (Round 1 up to Semi-Finals)
+    const rightColumns = [];
+
+    for (let round = 1; round < totalRounds; round++) {
+        const matchesPerSide = participantCount / Math.pow(2, round + 1);
+        leftColumns.push(createBracketColumn(`Round ${round} (Left)`, matchesPerSide));
+        rightColumns.unshift(createBracketColumn(`Round ${round} (Right)`, matchesPerSide));
+    }
+
+    // Round 1 (Outer edges)
+    const round1SideMatches = participantCount / 4;
+    const round1Left = createBracketColumn("Round 1", round1SideMatches);
+    const round1Right = createBracketColumn("Round 1", round1SideMatches);
+
+    // Center Column (Finals)
+    const centerColumn = createBracketColumn("FINALS", 1, true);
+
+    // Assemble inward layout: [L1, L2, ..., Center, ..., R2, R1]
+    const orderedColumns = [
+        round1Left,
+        ...leftColumns.slice(1),
+        centerColumn,
+        ...rightColumns.slice(0, rightColumns.length - 1),
+        round1Right
+    ];
+
+    // For 4 participants (2 rounds): Left R1 -> Center -> Right R1
+    if (participantCount === 4) {
+        container.appendChild(round1Left);
+        container.appendChild(centerColumn);
+        container.appendChild(round1Right);
+    } else {
+        orderedColumns.forEach(col => container.appendChild(col));
+    }
+    }
+
+    function createBracketColumn(title, matchCount, isCenter = false) {
+    const colDiv = document.createElement('div');
+    colDiv.className = `bracket-column ${isCenter ? 'center-final' : ''}`;
+
+    for (let i = 0; i < matchCount; i++) {
+        const card = document.createElement('div');
+        card.className = 'matchup-card';
+        
+        // Add 2 empty slot placeholders per matchup
+        card.innerHTML = `
+        <div class="matchup-slot placeholder">
+            <span>-- TBD --</span>
+            <span>0</span>
+        </div>
+        <div class="matchup-slot placeholder">
+            <span>-- TBD --</span>
+            <span>0</span>
+        </div>
+        `;
+        colDiv.appendChild(card);
+    }
+
+    return colDiv;
+    }
+
 </script>
 
+<?php include 'tourney-modal.php'; ?>
 </body>
 </html>
