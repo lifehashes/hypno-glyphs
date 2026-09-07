@@ -918,6 +918,17 @@ class ArenaManager {
         this.modules.delete(id);
     }
 
+    /**
+     * Resets the simulation state (particles, clusters, and effects)
+     * while preserving the module layout and map structure.
+     */
+    softReset() {
+        this.particles = [];
+        this.clusters = [];
+        this.effects = [];
+        this.lastTime = performance.now();
+    }
+
 }
 
 /**

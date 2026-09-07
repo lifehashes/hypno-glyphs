@@ -62,7 +62,11 @@ class LifeEngine {
         this.iteration = 0;
         this.maxGenerations = maxGen;
         this.history.clear();
-        this.isActive = true;
+        
+        // Explicitly reset execution flags
+        this.isActive = true;  
+        this.halted = false; // Add this line!
+        
         this.terminal = null;
         this.peakMap = Array.from({ length: this.n }, () => Array(this.n).fill(0));
         this.opacityMap = Array.from({ length: this.n }, () => Array(this.n).fill(0));

@@ -2061,7 +2061,7 @@
         }
     }
 
-    // Triggers the Game Over Scorecard overlay
+    // Triggers the Game Over Scorecard overlay & records tournament results if active
     function triggerGameOver() {
         isRunning = false;
         const btn = document.getElementById('sim-btn');
@@ -2085,24 +2085,28 @@
         const cardAlpha = document.getElementById('card-alpha');
         const cardBeta  = document.getElementById('card-beta');
         
-        cardAlpha.style.borderColor = alphaEngine.intrinsicColor;
-        cardBeta.style.borderColor  = betaEngine.intrinsicColor;
+        if (cardAlpha) cardAlpha.style.borderColor = alphaEngine.intrinsicColor;
+        if (cardBeta) cardBeta.style.borderColor  = betaEngine.intrinsicColor;
 
         // Determine Winner: Standard score or lower negative wins
-        cardAlpha.classList.remove('winner');
-        cardBeta.classList.remove('winner');
+        if (cardAlpha) cardAlpha.classList.remove('winner');
+        if (cardBeta) cardBeta.classList.remove('winner');
 
         if (scores.alphaScore !== scores.betaScore) {
-            // Higher score wins (including less negative, e.g., -5 wins against -20)
             if (scores.alphaScore > scores.betaScore) {
-                cardAlpha.classList.add('winner');
+                if (cardAlpha) cardAlpha.classList.add('winner');
             } else {
-                cardBeta.classList.add('winner');
+                if (cardBeta) cardBeta.classList.add('winner');
             }
         }
 
-        // Float overlay up
-        document.getElementById('game-over-overlay').classList.add('active');
+        // If tournament match active, record result into bracket engine
+        if (typeof currentTournament !== 'undefined' && currentTournament.activeMatch) {
+            recordMatchResult(scores.alphaScore, scores.betaScore);
+        } else {
+            // Float overlay up for individual/skirmish mode
+            document.getElementById('game-over-overlay').classList.add('active');
+        }
     }
 
     function dismissGameOver() {
