@@ -1535,57 +1535,159 @@
 
     function setupPaletteDragAndDrop() {
         const paletteCards = document.querySelectorAll('.palette-card');
+        const arenaContainer = document.querySelector('.arena-container');
+        
+        const GRID_SIZE = 20; 
 
-        paletteCards.forEach(card => {
-            card.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', card.dataset.type);
-                e.dataTransfer.effectAllowed = 'copy';
-            });
-        });
+        let selectedType = null;
 
-        canvas.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-        });
+        // Create container for the visual ghost preview
+        const ghost = document.createElement('div');
+        ghost.className = 'palette-ghost-preview';
+        ghost.style.position = 'absolute';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.display = 'none';
+        ghost.style.opacity = '0.5';
+        ghost.style.zIndex = '1000';
+        ghost.style.border = '2px dashed #00e5ff';
+        ghost.style.borderRadius = '4px';
+        
+        // Centered on cursor horizontally, top aligned vertically
+        ghost.style.transform = 'translate(-50%, 0%)'; 
+        document.body.appendChild(ghost);
 
-        canvas.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const type = e.dataTransfer.getData('text/plain');
-            if (!type) return;
+        function snapToGrid(val, size) {
+            return Math.round(val / size) * size;
+        }
 
-            const rect = canvas.getBoundingClientRect();
-            
+        // Helper to calculate module dimensions based on type definitions
+        function getModuleDimensions(type) {
             const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_') || type === 'BLOCK_SMALL';
             const isBarH = type === 'BAR_H';
             const isBarV = type === 'BAR_V';
 
-            let modWidth = 80;
-            let modHeight = 80;
+            if (isGranular) return { w: 40, h: 40 };
+            if (isBarH) return { w: 20, h: 80 };
+            if (isBarV) return { w: 80, h: 20 };
+            return { w: 80, h: 80 };
+        }
 
-            if (isGranular) {
-                modWidth = 40;
-                modHeight = 40;
-            } else if (isBarH) {
-                modWidth = 20;
-                modHeight = 80;
-            } else if (isBarV) {
-                modWidth = 80;
-                modHeight = 20;
+        function clearSelection() {
+            selectedType = null;
+            ghost.style.display = 'none';
+            paletteCards.forEach(c => c.classList.remove('selected-palette-item'));
+        }
+
+        // 1. Click palette card to activate / deactivate sticky mode
+        paletteCards.forEach(card => {
+            card.removeAttribute('draggable');
+
+            card.addEventListener('click', (e) => {
+                const type = card.getAttribute('data-type');
+
+                if (selectedType === type) {
+                    clearSelection();
+                } else {
+                    paletteCards.forEach(c => c.classList.remove('selected-palette-item'));
+                    selectedType = type;
+                    card.classList.add('selected-palette-item');
+                    
+                    // Set true size dimensions for ghost preview
+                    const dims = getModuleDimensions(selectedType);
+                    ghost.style.width = `${dims.w}px`;
+                    ghost.style.height = `${dims.h}px`;
+
+                    // Clone SVG and scale to fit true size
+                    const svgIcon = card.querySelector('svg')?.cloneNode(true);
+                    ghost.innerHTML = '';
+                    if (svgIcon) {
+                        svgIcon.style.width = '100%';
+                        svgIcon.style.height = '100%';
+                        ghost.appendChild(svgIcon);
+                    }
+                    
+                    ghost.style.display = 'block';
+                }
+            });
+        });
+
+        // 2. Track mouse movement & snap ghost position
+        document.addEventListener('mousemove', (e) => {
+            if (!selectedType || !arenaContainer) return;
+
+            // Calculate dims dynamically for the currently selected type
+            const dims = getModuleDimensions(selectedType);
+
+            const rect = arenaContainer.getBoundingClientRect();
+            const isHoveringCanvas = (
+                e.clientX >= rect.left &&
+                e.clientX <= rect.right &&
+                e.clientY >= rect.top &&
+                e.clientY <= rect.bottom
+            );
+
+            if (isHoveringCanvas) {
+                // 1. Get mouse position relative to canvas
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // 2. Fetch grid step size
+                const grid = arena.getGridDimensions(80, 4);
+
+                // 3. Snap the center of the module to the nearest grid line
+                const snappedCenterX = Math.round(mouseX / grid.secondaryStepX) * grid.secondaryStepX;
+                const snappedCenterY = Math.round(mouseY / grid.secondaryStepY) * grid.secondaryStepY;
+
+                // 4. Derive top-left position from snapped center
+                let snappedX = snappedCenterX - (dims.w / 2);
+                let snappedY = snappedCenterY - (dims.h / 2);
+
+                // 5. Clamp top-left within canvas boundaries
+                snappedX = Math.max(0, Math.min(rect.width - dims.w, snappedX));
+                snappedY = Math.max(0, Math.min(rect.height - dims.h, snappedY));
+
+                ghost.style.left = `${rect.left + window.scrollX + snappedX + (dims.w / 2)}px`;
+                ghost.style.top = `${rect.top + window.scrollY + snappedY}px`;
+            } else {
+                // Free-floating offset while outside canvas (top-centered on cursor)
+                ghost.style.left = `${e.pageX}px`;
+                ghost.style.top = `${e.pageY}px`;
+            }
+        });
+
+        // 3. Click canvas to place module
+        arenaContainer.addEventListener('click', (e) => {
+            if (!selectedType) return;
+
+            const rect = canvas.getBoundingClientRect();
+            if (
+                e.clientX < rect.left || e.clientX > rect.right ||
+                e.clientY < rect.top || e.clientY > rect.bottom
+            ) {
+                return;
             }
 
-            let dropX = e.clientX - rect.left - (modWidth / 2);
-            let dropY = e.clientY - rect.top - (modHeight / 2);
+            const dims = getModuleDimensions(selectedType);
 
-            // Snap cleanly to fine grid (20px steps)
+            // Get mouse position relative to canvas
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
             const grid = arena.getGridDimensions(80, 4);
-            dropX = Math.round(dropX / grid.secondaryStepX) * grid.secondaryStepX;
-            dropY = Math.round(dropY / grid.secondaryStepY) * grid.secondaryStepY;
 
-            dropX = Math.max(0, Math.min(canvas.width - modWidth, dropX));
-            dropY = Math.max(0, Math.min(canvas.height - modHeight, dropY));
+            // Snap the center point of the module to the nearest grid line
+            const snappedCenterX = Math.round(mouseX / grid.secondaryStepX) * grid.secondaryStepX;
+            const snappedCenterY = Math.round(mouseY / grid.secondaryStepY) * grid.secondaryStepY;
 
-            const uniqueId = `custom_${type.toLowerCase()}_${Date.now()}_${moduleCounter++}`;
-            const newModule = createModuleByType(type, uniqueId, dropX, dropY, modWidth, modHeight);
+            // Derive top-left position from snapped center
+            let dropX = snappedCenterX - (dims.w / 2);
+            let dropY = snappedCenterY - (dims.h / 2);
+
+            dropX = Math.max(0, Math.min(canvas.width - dims.w, dropX));
+            dropY = Math.max(0, Math.min(canvas.height - dims.h, dropY));
+
+            const uniqueId = `custom_${selectedType.toLowerCase()}_${Date.now()}_${moduleCounter++}`;
+            const newModule = createModuleByType(selectedType, uniqueId, dropX, dropY, dims.w, dims.h);
 
             if (newModule) {
                 arena.addModule(newModule);
@@ -1593,6 +1695,194 @@
             }
         });
 
+        // 4. Cancel placement
+        window.addEventListener('contextmenu', (e) => {
+            if (selectedType) {
+                e.preventDefault();
+                clearSelection();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && selectedType) {
+                clearSelection();
+            }
+        });
+    }
+
+    function setupPaletteDragAndDropOLD() {
+        const paletteCards = document.querySelectorAll('.palette-card');
+        const arenaContainer = document.querySelector('.arena-container');
+        
+        const GRID_SIZE = 20; 
+
+        let selectedType = null;
+
+        // Create container for the visual ghost preview
+        const ghost = document.createElement('div');
+        ghost.className = 'palette-ghost-preview';
+        ghost.style.position = 'absolute';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.display = 'none';
+        ghost.style.opacity = '0.5';
+        ghost.style.zIndex = '1000';
+        ghost.style.border = '2px dashed #00e5ff';
+        ghost.style.borderRadius = '4px';
+        ghost.style.transform = 'translate(-50%, -50%)'; 
+        document.body.appendChild(ghost);
+
+        function snapToGrid(val, size) {
+            return Math.round(val / size) * size;
+        }
+
+        // Helper to calculate module dimensions based on type definitions
+        function getModuleDimensions(type) {
+            const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_') || type === 'BLOCK_SMALL';
+            const isBarH = type === 'BAR_H';
+            const isBarV = type === 'BAR_V';
+
+            if (isGranular) return { w: 40, h: 40 };
+            if (isBarH) return { w: 20, h: 80 };
+            if (isBarV) return { w: 80, h: 20 };
+            return { w: 80, h: 80 };
+        }
+
+        function clearSelection() {
+            selectedType = null;
+            ghost.style.display = 'none';
+            paletteCards.forEach(c => c.classList.remove('selected-palette-item'));
+        }
+
+        // 1. Click palette card to activate / deactivate sticky mode
+        paletteCards.forEach(card => {
+            card.removeAttribute('draggable');
+
+            card.addEventListener('click', (e) => {
+                const type = card.getAttribute('data-type');
+
+                if (selectedType === type) {
+                    clearSelection();
+                } else {
+                    paletteCards.forEach(c => c.classList.remove('selected-palette-item'));
+                    selectedType = type;
+                    card.classList.add('selected-palette-item');
+                    
+                    // Set true size dimensions for ghost preview
+                    const dims = getModuleDimensions(selectedType);
+                    ghost.style.width = `${dims.w}px`;
+                    ghost.style.height = `${dims.h}px`;
+
+                    // Clone SVG and scale to fit true size
+                    const svgIcon = card.querySelector('svg')?.cloneNode(true);
+                    ghost.innerHTML = '';
+                    if (svgIcon) {
+                        svgIcon.style.width = '100%';
+                        svgIcon.style.height = '100%';
+                        ghost.appendChild(svgIcon);
+                    }
+                    
+                    ghost.style.display = 'block';
+                }
+            });
+        });
+
+        // 2. Track mouse movement & snap ghost position
+        document.addEventListener('mousemove', (e) => {
+            if (!selectedType || !arenaContainer) return;
+
+            // Calculate dims dynamically for the currently selected type
+            const dims = getModuleDimensions(selectedType);
+
+            const rect = arenaContainer.getBoundingClientRect();
+            const isHoveringCanvas = (
+                e.clientX >= rect.left &&
+                e.clientX <= rect.right &&
+                e.clientY >= rect.top &&
+                e.clientY <= rect.bottom
+            );
+
+            if (isHoveringCanvas) {
+                // 1. Get mouse position relative to canvas
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // 2. Fetch grid step size
+                const grid = arena.getGridDimensions(80, 4);
+
+                // 3. Snap the center of the module to the nearest grid line
+                const snappedCenterX = Math.round(mouseX / grid.secondaryStepX) * grid.secondaryStepX;
+                const snappedCenterY = Math.round(mouseY / grid.secondaryStepY) * grid.secondaryStepY;
+
+                // 4. Derive top-left position from snapped center
+                let snappedX = snappedCenterX - (dims.w / 2);
+                let snappedY = snappedCenterY - (dims.h / 2);
+
+                // 5. Clamp top-left within canvas boundaries
+                snappedX = Math.max(0, Math.min(rect.width - dims.w, snappedX));
+                snappedY = Math.max(0, Math.min(rect.height - dims.h, snappedY));
+
+                ghost.style.left = `${rect.left + window.scrollX + snappedX}px`;
+                ghost.style.top = `${rect.top + window.scrollY + snappedY}px`;
+            } else {
+                // Free-floating offset while outside canvas (centered on cursor)
+                ghost.style.left = `${e.pageX - (dims.w / 2)}px`;
+                ghost.style.top = `${e.pageY - (dims.h / 2)}px`;
+            }
+        });
+
+        // 3. Click canvas to place module
+        arenaContainer.addEventListener('click', (e) => {
+            if (!selectedType) return;
+
+            const rect = canvas.getBoundingClientRect();
+            if (
+                e.clientX < rect.left || e.clientX > rect.right ||
+                e.clientY < rect.top || e.clientY > rect.bottom
+            ) {
+                return;
+            }
+
+            const dims = getModuleDimensions(selectedType);
+
+            // Get mouse position relative to canvas
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const grid = arena.getGridDimensions(80, 4);
+
+            // Snap the center point of the module to the nearest grid line
+            const snappedCenterX = Math.round(mouseX / grid.secondaryStepX) * grid.secondaryStepX;
+            const snappedCenterY = Math.round(mouseY / grid.secondaryStepY) * grid.secondaryStepY;
+
+            // Derive top-left position from snapped center
+            let dropX = snappedCenterX - (dims.w / 2);
+            let dropY = snappedCenterY - (dims.h / 2);
+
+            dropX = Math.max(0, Math.min(canvas.width - dims.w, dropX));
+            dropY = Math.max(0, Math.min(canvas.height - dims.h, dropY));
+
+            const uniqueId = `custom_${selectedType.toLowerCase()}_${Date.now()}_${moduleCounter++}`;
+            const newModule = createModuleByType(selectedType, uniqueId, dropX, dropY, dims.w, dims.h);
+
+            if (newModule) {
+                arena.addModule(newModule);
+                if (!isRunning) arena.renderOnly();
+            }
+        });
+
+        // 4. Cancel placement
+        window.addEventListener('contextmenu', (e) => {
+            if (selectedType) {
+                e.preventDefault();
+                clearSelection();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && selectedType) {
+                clearSelection();
+            }
+        });
     }
 
     setupPaletteDragAndDrop();
