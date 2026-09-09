@@ -234,7 +234,7 @@ function updateMatchupCardDOM(cardElement, match) {
 }
 
 /**
- * Launches the currently queued match in the main physics arena.
+ * Launches or continues a matchup (Handles Round 1 vs Round 2 positions)
  */
 function launchNextMatch() {
   if (currentTournament.isFinished) {
@@ -242,38 +242,45 @@ function launchNextMatch() {
     return;
   }
 
-  // Find next uncompleted match in current round
+  // Find next uncompleted match in current tournament round
   const currentRoundMatches = currentTournament.rounds[currentTournament.currentRound - 1];
-  let nextMatch = currentRoundMatches.find(m => !m.completed);
+  let match = currentRoundMatches.find(m => !m.completed);
 
-  if (!nextMatch) {
-    // Advance to next round if available
+  if (!match) {
+    // Advance to next tournament round if available
     if (currentTournament.currentRound < currentTournament.rounds.length) {
       currentTournament.currentRound++;
       const newRoundMatches = currentTournament.rounds[currentTournament.currentRound - 1];
-      nextMatch = newRoundMatches.find(m => !m.completed);
+      match = newRoundMatches.find(m => !m.completed);
     }
   }
 
-  if (!nextMatch || !nextMatch.p1 || !nextMatch.p2) {
+  if (!match || !match.p1 || !match.p2) {
     updateStatusMessage("Waiting for prior matches to finish...");
     return;
   }
 
-  currentTournament.activeMatch = nextMatch;
+  // Track sub-round within the match object (0 = Leg 1, 1 = Leg 2)
+  if (match.subRound === undefined) {
+    match.subRound = 0;
+    match.p1Scores = [0, 0];
+    match.p2Scores = [0, 0];
+  }
+
+  currentTournament.activeMatch = match;
   renderBracketUI();
 
   // Hide modal overlay to reveal arena
   const tourneyModal = document.getElementById('tournamentModal');
   if (tourneyModal) tourneyModal.classList.add('hidden');
 
-  // 1. Reset match scores without resetting arena structures
+  // 1. Reset active scores
   if (typeof scores !== 'undefined') {
     scores.alphaScore = 0;
     scores.betaScore = 0;
   }
 
-  // 2. Clear lingering physical particles & clusters while keeping placed modules intact
+  // 2. Clear physical particles
   if (typeof arena !== 'undefined' && arena.softReset) {
     arena.softReset();
   } else if (typeof arena !== 'undefined') {
@@ -282,23 +289,23 @@ function launchNextMatch() {
     if (arena.effects) arena.effects = [];
   }
 
-  // 3. Load match Glyphs into existing LifeEngines
-  alphaEngine.loadFromBinary(nextMatch.p1.bin, nextMatch.p1.generations);
-  betaEngine.loadFromBinary(nextMatch.p2.bin, nextMatch.p2.generations);
+  // 3. Swap Glyphs between Alpha/Beta positions based on Sub-Round
+  const isLegTwo = (match.subRound === 1);
+  const alphaGlyph = isLegTwo ? match.p2 : match.p1;
+  const betaGlyph  = isLegTwo ? match.p1 : match.p2;
 
-  document.getElementById('alpha-name').innerText = nextMatch.p1.name;
-  document.getElementById('alpha-owner').innerText = nextMatch.p1.owner;
+  alphaEngine.loadFromBinary(alphaGlyph.bin, alphaGlyph.generations);
+  betaEngine.loadFromBinary(betaGlyph.bin, betaGlyph.generations);
+
+  document.getElementById('alpha-name').innerText = alphaGlyph.name;
+  document.getElementById('alpha-owner').innerText = alphaGlyph.owner;
   updateGlyphColorStyling('alpha', alphaEngine.intrinsicColor);
 
-  document.getElementById('beta-name').innerText = nextMatch.p2.name;
-  document.getElementById('beta-owner').innerText = nextMatch.p2.owner;
+  document.getElementById('beta-name').innerText = betaGlyph.name;
+  document.getElementById('beta-owner').innerText = betaGlyph.owner;
   updateGlyphColorStyling('beta', betaEngine.intrinsicColor);
 
-  // 4. Reset GOL engines to initial state
-  // alphaEngine.resetToInitial();
-  // betaEngine.resetToInitial();
-
-  // 5. Reset internal state timers for active spawner/QCD modules in the existing arena
+  // 4. Reset internal state timers for active modules
   if (typeof arena !== 'undefined' && arena.modules) {
     arena.modules.forEach(mod => {
       if (mod.stepTimer !== undefined) mod.stepTimer = 0;
@@ -307,7 +314,7 @@ function launchNextMatch() {
     });
   }
 
-  // 6. Explicitly restart match execution loop
+  // 5. Restart match loop
   isRunning = true;
   const simBtn = document.getElementById('sim-btn');
   if (simBtn) {
@@ -315,29 +322,58 @@ function launchNextMatch() {
     simBtn.classList.remove('pulse-green');
   }
 
-  // Force immediate render update to clear frozen frames
   alphaEngine.render();
   betaEngine.render();
   if (typeof updateHUD === 'function') updateHUD();
 
-  updateStatusMessage(`Playing: Round ${nextMatch.round} - ${nextMatch.p1.name} vs ${nextMatch.p2.name}`);
+  // Show "ROUND 1" or "ROUND 2" overlay over the canvas
+  const legLabel = `ROUND ${match.subRound + 1}`;
+  showCanvasRoundOverlay(legLabel, 2000);
+
+  updateStatusMessage(
+    `Match ${match.id} (Leg ${match.subRound + 1}/2): ` +
+    `${match.p1.name} vs ${match.p2.name}`
+  );
   loop();
 }
 
 /**
- * Called by physics engine when active tournament match terminates.
- * Records scores and propagates winner forward.
+ * Records scores and handles Round 1 -> Round 2 transition or Bracket Propagation
  */
 function recordMatchResult(alphaScore, betaScore) {
   const match = currentTournament.activeMatch;
   if (!match) return;
 
-  match.p1Score = alphaScore;
-  match.p2Score = betaScore;
+  const isLegTwo = (match.subRound === 1);
+
+  // Map scores back to original participant entities
+  if (!isLegTwo) {
+    match.p1Scores[0] = alphaScore;
+    match.p2Scores[0] = betaScore;
+    
+    // Increment to Leg 2 and relaunch
+    match.subRound = 1;
+    updateStatusMessage(`Leg 1 finished! Preparing Leg 2 (Swapping Positions)...`);
+    
+    // Short delay before automatically starting Leg 2
+    setTimeout(() => {
+      launchNextMatch();
+    }, 1000);
+
+    return; // Stop here; do not declare a winner yet
+  }
+
+  // Handle Leg 2 Scores (Positions were inverted, so Alpha is p2, Beta is p1)
+  match.p1Scores[1] = betaScore;
+  match.p2Scores[1] = alphaScore;
+
+  // Aggregate Total Scores
+  match.p1Score = match.p1Scores[0] + match.p1Scores[1];
+  match.p2Score = match.p2Scores[0] + match.p2Scores[1];
   match.completed = true;
 
-  // Decide Winner
-  if (alphaScore >= betaScore) {
+  // Decide Winner based on aggregated totals
+  if (match.p1Score >= match.p2Score) {
     match.winner = match.p1;
   } else {
     match.winner = match.p2;
@@ -384,3 +420,128 @@ document.addEventListener('DOMContentLoaded', () => {
     nextMatchBtn.addEventListener('click', launchNextMatch);
   }
 });
+
+// Base Match Data Structure
+function createMatch(matchId, playerA, playerB) {
+  return {
+    id: matchId,
+    players: { A: playerA, B: playerB },
+    currentRound: 0, // 0 = Round 1, 1 = Round 2, 2 = Complete
+    scores: { A: [0, 0], B: [0, 0] }, // [Round 1, Round 2]
+    status: 'pending', // 'pending', 'in_progress', 'completed'
+    winner: null
+  };
+}
+
+// Map Emitter Positions Based on Active Round
+function getEmitterConfigForRound(match, baseEmitters, canvasWidth) {
+  const isRoundTwo = match.currentRound === 1;
+
+  return baseEmitters.map(emitter => {
+    // Determine player assignment and position based on round index
+    const assignedPlayer = (emitter.team === 'A' ^ isRoundTwo) ? match.players.A : match.players.B;
+    
+    // Invert X coordinate for symmetry swap during Round 2
+    const currentX = isRoundTwo ? (canvasWidth - emitter.x) : emitter.x;
+
+    return {
+      ...emitter,
+      x: currentX,
+      owner: assignedPlayer,
+      activeTeam: (emitter.team === 'A' ^ isRoundTwo) ? 'A' : 'B'
+    };
+  });
+}
+
+// Match Lifecycle Handler
+class MatchRunner {
+  constructor(arenaManager, lifeEngine) {
+    this.arena = arenaManager;
+    this.engine = lifeEngine;
+  }
+
+  // Load and launch current sub-round
+  startSubRound(match, baseEmitters) {
+    match.status = 'in_progress';
+    
+    // 1. Reset simulation grid and particle state
+    this.engine.resetGrid();
+    this.arena.clearParticles();
+
+    // 2. Resolve emitter placement with current round's positions
+    const activeEmitters = getEmitterConfigForRound(
+      match, 
+      baseEmitters, 
+      this.arena.canvas.width
+    );
+
+    // 3. Apply emitters to the arena manager
+    this.arena.setEmitters(activeEmitters);
+    
+    // 4. Begin simulation loop
+    this.arena.start();
+  }
+
+  // Finalize current sub-round and transition to Round 2 or Complete
+  onSubRoundEnd(match, baseEmitters, roundScoreA, roundScoreB) {
+    const roundIdx = match.currentRound;
+    
+    // Record scores for the active round
+    match.scores.A[roundIdx] = roundScoreA;
+    match.scores.B[roundIdx] = roundScoreB;
+
+    if (roundIdx === 0) {
+      // Transition to Round 2
+      match.currentRound = 1;
+      this.startSubRound(match, baseEmitters);
+    } else {
+      // Both rounds finished — calculate totals and finalize
+      match.currentRound = 2;
+      match.status = 'completed';
+
+      const totalA = match.scores.A[0] + match.scores.A[1];
+      const totalB = match.scores.B[0] + match.scores.B[1];
+
+      // Handle win/tie logic (can be updated for tiebreakers if totals match)
+      match.winner = totalA >= totalB ? match.players.A : match.players.B;
+      
+      this.arena.stop();
+      return match.winner;
+    }
+  }
+}
+
+/**
+ * Triggers a temporary overlay message over the canvas container.
+ * @param {string} text - Message to display (e.g., "ROUND 1", "ROUND 2")
+ * @param {number} duration - Display time in milliseconds (default: 2000ms)
+ */
+function showCanvasRoundOverlay(text, duration = 2000) {
+  let overlayEl = document.getElementById('canvasRoundOverlay');
+  
+  // Create the overlay DOM element dynamically if it doesn't exist
+  if (!overlayEl) {
+    overlayEl = document.createElement('div');
+    overlayEl.id = 'canvasRoundOverlay';
+    overlayEl.className = 'round-overlay';
+    
+    // Attach relative to the main canvas wrapper container
+    const container = document.getElementById('canvas-container') || document.body;
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
+    container.appendChild(overlayEl);
+  }
+
+  overlayEl.innerText = text;
+  
+  // Fade in
+  requestAnimationFrame(() => {
+    overlayEl.classList.add('show');
+  });
+
+  // Fade out and clean up
+  setTimeout(() => {
+    overlayEl.classList.remove('show');
+  }, duration);
+}

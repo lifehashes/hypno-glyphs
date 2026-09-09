@@ -34,7 +34,7 @@
             g.HASH,
             g.GRID_SIZE
         FROM GLYPHREG g
-        WHERE g.OWNER = :owner_id AND g.GRID_SIZE='16'
+        WHERE g.OWNER = :owner_id AND g.GRID_SIZE='16' AND g.ITERATIONS>=500 AND g.ITERATIONS<=599
         GROUP BY g.BATTLE_NAME, g.ITERATIONS, g.PEAK, g.MAX, g.OWNER, g.BIN, g.HASH, g.GRID_SIZE
         ORDER BY g.BATTLE_NAME ASC
     ");
@@ -459,6 +459,27 @@
 
         .tourney-footer .status-msg {
             text-align: center;
+        }
+
+        /* Canvas Overlay for Round Announcements */
+        .round-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: monospace, sans-serif;
+        font-size: 3rem;
+        font-weight: bold;
+        color: #00ffff;
+        text-shadow: 0 0 15px rgba(0, 255, 255, 0.8), 0 0 30px rgba(0, 255, 255, 0.4);
+        pointer-events: none;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.4s ease-in-out;
+        }
+
+        .round-overlay.show {
+        opacity: 1;
         }
 
     </style>
