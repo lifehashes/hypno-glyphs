@@ -465,6 +465,8 @@
 </head>
 <body>
 
+<audio id="sfx-score" src="scorepoint.mp3" preload="auto"></audio>
+
 <div class="outer-frame">
     <div class="terminal-header">
         <div class="stat-line">HYPNOGLYPHS // B3/S23-PHYSICS ENGINE v0.1</div>
@@ -886,6 +888,30 @@
                         <rect x="6" y="11" width="20" height="10" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
                     </svg>
                     <span>BAR (V)</span>
+                </div>
+
+                <!-- CIRCLE OBSTACLE (SMALL) -->
+                <div class="palette-card" draggable="true" data-type="CIRCLE_OBSTACLE_S">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="6" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>CIRCLE (S)</span>
+                </div>
+
+                <!-- CIRCLE OBSTACLE (MEDIUM) -->
+                <div class="palette-card" draggable="true" data-type="CIRCLE_OBSTACLE_M">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="9" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>CIRCLE (M)</span>
+                </div>
+
+                <!-- CIRCLE OBSTACLE (LARGE) -->
+                <div class="palette-card" draggable="true" data-type="CIRCLE_OBSTACLE_L">
+                    <svg viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="12" fill="rgba(255, 170, 0, 0.4)" stroke="#ffaa00" stroke-width="1.5"/>
+                    </svg>
+                    <span>CIRCLE (L)</span>
                 </div>
 
                 <!-- OSMOSIS ALPHA -->
@@ -1527,7 +1553,13 @@
             case 'OSMOSIS_BETA':
                 return new OsmosisModule(id, x, y, width, height, betaEngine.intrinsicColor, 'BETA');   
             case 'PREDATOR':
-                return new PredatorModule(id, x, y, width, height);             
+                return new PredatorModule(id, x, y, width, height);      
+            case 'CIRCLE_OBSTACLE_S':
+                return new CircleObstacleModule(id, x, y, 10, 10, 10);
+            case 'CIRCLE_OBSTACLE_M':
+                return new CircleObstacleModule(id, x, y, 20, 20, 20);
+            case 'CIRCLE_OBSTACLE_L':
+                return new CircleObstacleModule(id, x, y, 40, 40, 30);       
             default:
                 return null;
         }
@@ -1562,6 +1594,9 @@
 
         // Helper to calculate module dimensions based on type definitions
         function getModuleDimensions(type) {
+            if (type === 'CIRCLE_OBSTACLE_S') return { w: 10, h: 10 };
+            if (type === 'CIRCLE_OBSTACLE_M') return { w: 15, h: 15 };
+            if (type === 'CIRCLE_OBSTACLE_L') return { w: 20, h: 20 };
             const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_') || type === 'BLOCK_SMALL';
             const isBarH = type === 'BAR_H';
             const isBarV = type === 'BAR_V';
@@ -2550,6 +2585,18 @@
     }
 
     return colDiv;
+    }
+
+    function playScoreSound() {
+        const sound = document.getElementById('sfx-score');
+        if (sound) {
+            // Clone node to allow overlapping sounds if multiple particles hit quickly
+            const soundClone = sound.cloneNode();
+            soundClone.volume = 0.5; // Adjust volume as needed (0.0 to 1.0)
+            soundClone.play().catch(() => {
+                // Catches browser autoplay restrictions before user interaction
+            });
+        }
     }
 
 </script>

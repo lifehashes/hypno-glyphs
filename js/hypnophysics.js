@@ -954,6 +954,11 @@ class SinkModule extends ArenaModule {
         if (distSq <= (this.radius * 0.8) ** 2) {
             particle.dead = true;
 
+            // Trigger score audio
+            if (typeof playScoreSound === 'function') {
+                playScoreSound();
+            }            
+
             // 1. Calculate Charge Multiplier
             const chargeMagnitude = Math.abs(particle.chargeVal);
             const chargeMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
@@ -2316,6 +2321,66 @@ class PredatorModule extends ArenaModule {
         ctx.font = '9px monospace';
         ctx.textAlign = 'center';
         ctx.fillText('PREDATOR', c.x, this.y + 12);
+
+        ctx.restore();
+    }
+}
+
+class CircleObstacleModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 80, radius = 30) {
+        super(id, x, y, width, height, 'CIRCLE_OBSTACLE');
+        this.radius = radius;
+    }
+
+    affectParticle(particle, dt) {
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        const dx = particle.x - cx;
+        const dy = particle.y - cy;
+        const dist = Math.hypot(dx, dy);
+        const minDist = this.radius + particle.radius;
+
+        // Collision detection and elastic bounce
+        if (dist < minDist && dist > 0) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+
+            // Reposition particle along collision normal
+            particle.x = cx + nx * minDist;
+            particle.y = cy + ny * minDist;
+
+            // Reflect velocity vector
+            const dot = particle.vx * nx + particle.vy * ny;
+            if (dot < 0) {
+                particle.vx -= 2 * dot * nx;
+                particle.vy -= 2 * dot * ny;
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        // Visual selection outline when editing
+        if (typeof window !== 'undefined' && window.selectedModule === this) {
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeRect(this.x - 2, this.y - 2, this.width + 4, this.height + 4);
+            ctx.setLineDash([]);
+        }
+
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.25)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
         ctx.restore();
     }
