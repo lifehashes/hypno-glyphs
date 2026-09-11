@@ -956,7 +956,7 @@ class SinkModule extends ArenaModule {
 
             // Trigger score audio
             if (typeof playScoreSound === 'function') {
-                playScoreSound();
+                // playScoreSound();
             }            
 
             // 1. Calculate Charge Multiplier
@@ -2379,6 +2379,280 @@ class CircleObstacleModule extends ArenaModule {
 
         ctx.beginPath();
         ctx.arc(cx, cy, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * Girder Slanted Right (Bottom-Left to Top-Right)
+ * Parallelogram covering a 3-grid footprint spanning left to right (e.g. 60x60px).
+ * Moves slowly to the right (+X) and reverses direction upon hitting arena boundaries.
+ */
+class GirderSlantRightModule extends ArenaModule {
+    constructor(id, x, y, width = 60, height = 60, speed = 25, direction = 1) {
+        super(id, x, y, width, height, 'GIRDER_SLANT_RIGHT');
+        this.speed = 50*speed;       // Movement speed in px/sec
+        this.direction = direction; // 1 for moving right, -1 for moving left
+        this.type = 'GIRDER_SLANT_RIGHT';
+        // this.isStatic = true; // Lock physics position
+        this.mass = Infinity; // Prevent gravitational movement or dynamic updates
+    }
+
+    /**
+     * Calculates the 4 vertices of the 45° parallelogram relative to current position.
+     * Top and bottom edges remain horizontal.
+     */
+    getVertices() {
+        const w = this.width;
+        const h = this.height;
+        const offset = h; // 45 degree angle: dx = dy = height
+
+        return [
+            { x: this.x + offset, y: this.y },                 // Top-Left
+            { x: this.x + w + offset, y: this.y },             // Top-Right
+            { x: this.x + w, y: this.y + h },                 // Bottom-Right
+            { x: this.x, y: this.y + h }                      // Bottom-Left
+        ];
+    }
+
+    update(dt, arena) {
+        // Move girder horizontally
+        this.x += this.direction * this.speed * dt;
+
+        // Boundary reflection against canvas edges
+        const canvasWidth = arena ? arena.canvas.width : 800;
+        const offset = this.height;
+        const minX = this.x;
+        const maxX = this.x + this.width + offset;
+
+        if (maxX >= canvasWidth) {
+            this.x = canvasWidth - (this.width + offset);
+            this.direction = -1;
+        } else if (minX <= 0) {
+            this.x = 0;
+            this.direction = 1;
+        }
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.dead) return;
+
+        const vertices = this.getVertices();
+        const pRadius = particle.radius || 2.5;
+
+        // SAT Collision & Bounce Resolution against the 4 polygon faces
+        let minOverlap = Infinity;
+        let collisionNormal = null;
+
+        for (let i = 0; i < vertices.length; i++) {
+            const v1 = vertices[i];
+            const v2 = vertices[(i + 1) % vertices.length];
+
+            // Edge direction vector
+            const edgeX = v2.x - v1.x;
+            const edgeY = v2.y - v1.y;
+
+            // Outward face normal vector
+            let nx = edgeY;
+            let ny = -edgeX;
+            const len = Math.hypot(nx, ny);
+            nx /= len;
+            ny /= len;
+
+            // Distance from particle center to edge plane
+            const dist = (particle.x - v1.x) * nx + (particle.y - v1.y) * ny;
+            
+            // If particle is beyond outer boundary + radius, no collision on this axis
+            if (dist > pRadius) return;
+            if (dist < pRadius && particle.isTracked){ console.log(`dist to vertex ${i}: ${dist}`); }
+
+            const overlap = pRadius - dist;
+            if (overlap < minOverlap) {
+                minOverlap = overlap;
+                collisionNormal = { x: nx, y: ny };
+            }
+            //console.log(`minOverlap: ${minOverlap}, collisionNormal: [${collisionNormal.x}, ${collisionNormal.y}]`);
+        }
+
+        // Particle is inside collision shell -> Eject & Bounce
+        if (collisionNormal && minOverlap > 0) {
+            console.log(`${particle} collided with girder`);
+            const nx = collisionNormal.x;
+            const ny = collisionNormal.y;
+
+            // Nudge particle out of the girder geometry
+            particle.x += nx * (minOverlap + 0.5);
+            particle.y += ny * (minOverlap + 0.5);
+
+            // Reflect particle velocity vector: V_new = V - 2*(V . N)*N
+            const dot = particle.vx * nx + particle.vy * ny;
+            if (dot < 0) {
+                particle.vx -= 2 * dot * nx;
+                particle.vy -= 2 * dot * ny;
+
+                // Transfer horizontal dynamic velocity momentum from moving girder
+                particle.vx += this.direction * this.speed * 0.4;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const verts = this.getVertices();
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(verts[0].x, verts[0].y);
+        for (let i = 1; i < verts.length; i++) {
+            ctx.lineTo(verts[i].x, verts[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * Girder Slanted Left (Bottom-Right to Top-Left)
+ * Parallelogram covering a 3-grid footprint spanning right to left (e.g. 60x60px).
+ * Moves slowly to the left (-X) and reverses direction upon hitting arena boundaries.
+ */
+class GirderSlantLeftModule extends ArenaModule {
+    constructor(id, x, y, width = 60, height = 60, speed = 25, direction = -1) {
+        super(id, x, y, width, height, 'GIRDER_SLANT_LEFT');
+        this.speed = 50 * speed;       // Movement speed in px/sec
+        this.direction = direction;   // -1 for moving left, 1 for moving right
+        this.type = 'GIRDER_SLANT_LEFT';
+        this.mass = Infinity;         // Prevent gravitational movement or dynamic updates
+    }
+
+    /**
+     * Calculates the 4 vertices of the -45° parallelogram relative to current position.
+     * Top and bottom edges remain horizontal.
+     */
+    getVertices() {
+        const w = this.width;
+        const h = this.height;
+        const offset = h; // 45 degree angle slant to the left: dx = -dy = -height
+
+        return [
+            { x: this.x - offset, y: this.y },                 // Top-Left
+            { x: this.x + w - offset, y: this.y },             // Top-Right
+            { x: this.x + w, y: this.y + h },                 // Bottom-Right
+            { x: this.x, y: this.y + h }                      // Bottom-Left
+        ];
+    }
+
+    update(dt, arena) {
+        // Move girder horizontally
+        this.x += this.direction * this.speed * dt;
+
+        // Boundary reflection against canvas edges
+        const canvasWidth = arena ? arena.canvas.width : 800;
+        const offset = this.height;
+
+        // Outer visual boundaries of the left-slanted parallelogram
+        const minX = this.x - offset;       // Top-Left vertex X
+        const maxX = this.x + this.width;   // Bottom-Right vertex X
+
+        if (maxX >= canvasWidth) {
+            // Clamp so the rightmost edge (maxX) stays inside the canvas
+            this.x = canvasWidth - this.width;
+            this.direction = -1; // Reverse to left
+        } else if (minX <= 0) {
+            // Clamp so the leftmost edge (minX) stays inside the canvas
+            this.x = offset;
+            this.direction = 1;  // Reverse to right
+        }
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.dead) return;
+
+        const vertices = this.getVertices();
+        const pRadius = particle.radius || 2.5;
+
+        // SAT Collision & Bounce Resolution against the 4 polygon faces
+        let minOverlap = Infinity;
+        let collisionNormal = null;
+
+        for (let i = 0; i < vertices.length; i++) {
+            const v1 = vertices[i];
+            const v2 = vertices[(i + 1) % vertices.length];
+
+            // Edge direction vector
+            const edgeX = v2.x - v1.x;
+            const edgeY = v2.y - v1.y;
+
+            // Outward face normal vector
+            let nx = edgeY;
+            let ny = -edgeX;
+            const len = Math.hypot(nx, ny);
+            nx /= len;
+            ny /= len;
+
+            // Distance from particle center to edge plane
+            const dist = (particle.x - v1.x) * nx + (particle.y - v1.y) * ny;
+            
+            // If particle is beyond outer boundary + radius, no collision on this axis
+            if (dist > pRadius) return;
+            if (dist < pRadius && particle.isTracked) { 
+                console.log(`dist to vertex ${i}: ${dist}`); 
+            }
+
+            const overlap = pRadius - dist;
+            if (overlap < minOverlap) {
+                minOverlap = overlap;
+                collisionNormal = { x: nx, y: ny };
+            }
+        }
+
+        // Particle is inside collision shell -> Eject & Bounce
+        if (collisionNormal && minOverlap > 0) {
+            console.log(`${particle} collided with left girder`);
+            const nx = collisionNormal.x;
+            const ny = collisionNormal.y;
+
+            // Nudge particle out of the girder geometry
+            particle.x += nx * (minOverlap + 0.5);
+            particle.y += ny * (minOverlap + 0.5);
+
+            // Reflect particle velocity vector: V_new = V - 2*(V . N)*N
+            const dot = particle.vx * nx + particle.vy * ny;
+            if (dot < 0) {
+                particle.vx -= 2 * dot * nx;
+                particle.vy -= 2 * dot * ny;
+
+                // Transfer horizontal dynamic velocity momentum from moving girder
+                particle.vx += this.direction * this.speed * 0.4;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const verts = this.getVertices();
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(verts[0].x, verts[0].y);
+        for (let i = 1; i < verts.length; i++) {
+            ctx.lineTo(verts[i].x, verts[i].y);
+        }
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
 

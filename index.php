@@ -34,7 +34,7 @@
             g.HASH,
             g.GRID_SIZE
         FROM GLYPHREG g
-        WHERE g.OWNER = :owner_id AND g.GRID_SIZE='16' AND g.ITERATIONS>=500 AND g.ITERATIONS<=599
+        WHERE g.OWNER = :owner_id AND g.GRID_SIZE='16' AND g.ITERATIONS>=100 AND g.ITERATIONS<=120
         GROUP BY g.BATTLE_NAME, g.ITERATIONS, g.PEAK, g.MAX, g.OWNER, g.BIN, g.HASH, g.GRID_SIZE
         ORDER BY g.BATTLE_NAME ASC
     ");
@@ -837,6 +837,26 @@
         <div class="player-box editor-palette-box" id="editor-panel-mech">
             <div class="pane-title" style="color:#ffaa00; border-color:#ffaa00;">EDITOR // MECHANICS</div>
             <div class="palette-grid">
+                <!-- GIRDER HORIZONTAL -->
+                <div class="palette-card" draggable="true" data-type="GIRDER_H">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="2" y="12" width="28" height="8" fill="rgba(255, 170, 0, 0.2)" stroke="#ffaa00" stroke-width="1.5"/>
+                        <line x1="2" y1="12" x2="30" y2="20" stroke="#ffaa00" stroke-width="1"/>
+                        <line x1="2" y1="20" x2="30" y2="12" stroke="#ffaa00" stroke-width="1"/>
+                    </svg>
+                    <span>GIRDER (H)</span>
+                </div>
+
+                <!-- GIRDER VERTICAL -->
+                <div class="palette-card" draggable="true" data-type="GIRDER_V">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="12" y="2" width="8" height="28" fill="rgba(255, 170, 0, 0.2)" stroke="#ffaa00" stroke-width="1.5"/>
+                        <line x1="12" y1="2" x2="20" y2="30" stroke="#ffaa00" stroke-width="1"/>
+                        <line x1="20" y1="2" x2="12" y2="30" stroke="#ffaa00" stroke-width="1"/>
+                    </svg>
+                    <span>GIRDER (V)</span>
+                </div>
+
                 <!-- PADDLE WHEEL -->
                 <div class="palette-card" draggable="true" data-type="PADDLE_WHEEL">
                     <svg viewBox="0 0 32 32">
@@ -1551,6 +1571,10 @@
                 return new BricksModule(id, x, y, width, height, 0);
             case 'MAGNETIZER':
                 return new MagnetizerModule(id, x, y, width, height);
+            case 'GIRDER_H':
+                return new GirderSlantLeftModule(id, x, y, 20, 120, 1);
+            case 'GIRDER_V':
+                return new GirderSlantRightModule(id, x, y, 20, 120, 1);
             case 'PADDLE_WHEEL':
                 return new PaddleWheelModule(id, x, y, width, height, 2, 1);
             case 'WEDGE_BL':
@@ -1618,6 +1642,8 @@
             if (type === 'CIRCLE_OBSTACLE_S') return { w: 10, h: 10 };
             if (type === 'CIRCLE_OBSTACLE_M') return { w: 15, h: 15 };
             if (type === 'CIRCLE_OBSTACLE_L') return { w: 20, h: 20 };
+            if (type === 'GIRDER_H') return { w: 20, h: 120 };
+            if (type === 'GIRDER_V') return { w: 20, h: 120 };
             const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_') || type === 'BLOCK_SMALL';
             const isBarH = type === 'BAR_H';
             const isBarV = type === 'BAR_V';
@@ -1793,6 +1819,8 @@
 
         // Helper to calculate module dimensions based on type definitions
         function getModuleDimensions(type) {
+            if (type === 'GIRDER_H') return { w: 120, h: 20 };
+            if (type === 'GIRDER_V') return { w: 20, h: 120 };
             const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_') || type === 'BLOCK_SMALL';
             const isBarH = type === 'BAR_H';
             const isBarV = type === 'BAR_V';
