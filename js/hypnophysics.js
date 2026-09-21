@@ -927,6 +927,15 @@ class ArenaManager {
         this.clusters = [];
         this.effects = [];
         this.lastTime = performance.now();
+
+        if (this.modules) {
+            for (const module of this.modules) {
+                if (typeof module.reset === 'function') {
+                    module.reset();
+                }
+            }
+        }
+
     }
 
 }
@@ -966,11 +975,14 @@ class SinkModule extends ArenaModule {
             // 2. Calculate Age Multiplier (1 Shake = 10s, minimum multiplier of 1)
             const ageMultiplier = Math.max(1, particle.ageShakes);
 
-            // 3. Compute Net Point Value
-            // Matter gives + (Charge * Age), Anti-Matter gives - (Charge * Age)
-            const pointValue = (particle.isAnti ? -1 : 1) * chargeMultiplier * ageMultiplier;
+            // 3. Fetch Global Dynamic Time Multiplier (doubles every 10s)
+            const timeMultiplier = (typeof scoreMultiplier !== 'undefined') ? scoreMultiplier : 1;
 
-            // 4. Credit / Debit the appropriate source score
+            // 4. Compute Net Point Value
+            // Matter gives + (Charge * Age * TimeMultiplier), Anti-Matter gives - (Charge * Age * TimeMultiplier)
+            const pointValue = (particle.isAnti ? -1 : 1) * chargeMultiplier * ageMultiplier * timeMultiplier;
+
+            // 5. Credit / Debit the appropriate source score
             if (particle.sourceId && particle.sourceId.includes('alpha')) {
                 this.scoreTracker.alphaScore += pointValue;
             } else if (particle.sourceId && particle.sourceId.includes('beta')) {
@@ -1062,6 +1074,11 @@ class QCDInverterModule extends ArenaModule {
         ctx.fillText('QCD INVERTER', c.x, this.y + 12);
         ctx.restore();
     }
+
+    reset() {
+        this.activeParticles.clear();
+    }
+
 }
 
 /**
@@ -1255,6 +1272,11 @@ class ChargerModule extends ArenaModule {
         ctx.fillText(isPos ? '+CHARGER' : '-CHARGER', c.x, this.y + 12);
         ctx.restore();
     }
+
+    reset() {
+        this.activeParticles.clear();
+    }
+
 }
 
 /**
@@ -1595,6 +1617,11 @@ class MagnetizerModule extends ArenaModule {
         ctx.fillText('MAGNETIZER', c.x, this.y + 12);
         ctx.restore();
     }
+
+    reset() {
+        this.activeParticles.clear();
+    }
+
 }
 
 /**
@@ -1751,7 +1778,7 @@ class PaddleWheelModule extends ArenaModule {
         ctx.translate(c.x, c.y);
 
         // Center hub
-        ctx.fillStyle = '#ffaa00';
+        ctx.fillStyle = '#2e2c29';
         ctx.beginPath();
         ctx.arc(0, 0, 5, 0, Math.PI * 2);
         ctx.fill();
@@ -1764,10 +1791,10 @@ class PaddleWheelModule extends ArenaModule {
         ctx.stroke();
 
         // Render 10 Spokes / Blades
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 2;
         ctx.shadowBlur = 6;
-        ctx.shadowColor = '#ffaa00';
+        ctx.shadowColor = '#2e2c29';
 
         const spokeStep = (Math.PI * 2) / this.numSpokes;
         for (let i = 0; i < this.numSpokes; i++) {
@@ -1784,7 +1811,7 @@ class PaddleWheelModule extends ArenaModule {
         ctx.restore();
 
         ctx.font = '9px monospace';
-        ctx.fillStyle = '#ffaa00';
+        ctx.fillStyle = '#2e2c29';
         ctx.textAlign = 'center';
         ctx.fillText('PADDLE WHEEL', c.x, this.y + 12);
     }
@@ -1911,7 +1938,7 @@ class WedgeModule extends ArenaModule {
         super.draw(ctx);
         ctx.save();
         ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
 
         const x0 = this.x, y0 = this.y;
@@ -1980,7 +2007,7 @@ class BlockSmallModule extends ArenaModule {
         super.draw(ctx);
         ctx.save();
         ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
         ctx.fillRect(this.x, this.y, this.width, this.height);
         ctx.strokeRect(this.x, this.y, this.width, this.height);
@@ -2029,7 +2056,7 @@ class BlockModule extends ArenaModule {
         super.draw(ctx);
         ctx.save();
         ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
         ctx.fillRect(this.x, this.y, this.width, this.height);
         ctx.strokeRect(this.x, this.y, this.width, this.height);
@@ -2078,7 +2105,7 @@ class BarHModule extends ArenaModule {
         super.draw(ctx);
         ctx.save();
         ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
         ctx.fillRect(this.x, this.y, this.width, this.height);
         ctx.strokeRect(this.x, this.y, this.width, this.height);
@@ -2127,7 +2154,7 @@ class BarVModule extends ArenaModule {
         super.draw(ctx);
         ctx.save();
         ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
         ctx.fillRect(this.x, this.y, this.width, this.height);
         ctx.strokeRect(this.x, this.y, this.width, this.height);
@@ -2324,6 +2351,11 @@ class PredatorModule extends ArenaModule {
 
         ctx.restore();
     }
+
+    reset() {
+        this.activeParticles.clear();
+    }
+
 }
 
 class CircleObstacleModule extends ArenaModule {
@@ -2374,7 +2406,7 @@ class CircleObstacleModule extends ArenaModule {
         }
 
         ctx.fillStyle = 'rgba(255, 170, 0, 0.25)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 2;
 
         ctx.beginPath();
@@ -2479,7 +2511,7 @@ class GirderSlantRightModule extends ArenaModule {
 
         // Particle is inside collision shell -> Eject & Bounce
         if (collisionNormal && minOverlap > 0) {
-            console.log(`${particle} collided with girder`);
+            // console.log(`${particle} collided with girder`);
             const nx = collisionNormal.x;
             const ny = collisionNormal.y;
 
@@ -2505,7 +2537,7 @@ class GirderSlantRightModule extends ArenaModule {
 
         ctx.save();
         ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
 
         ctx.beginPath();
@@ -2618,7 +2650,7 @@ class GirderSlantLeftModule extends ArenaModule {
 
         // Particle is inside collision shell -> Eject & Bounce
         if (collisionNormal && minOverlap > 0) {
-            console.log(`${particle} collided with left girder`);
+            // console.log(`${particle} collided with left girder`);
             const nx = collisionNormal.x;
             const ny = collisionNormal.y;
 
@@ -2644,7 +2676,7 @@ class GirderSlantLeftModule extends ArenaModule {
 
         ctx.save();
         ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
-        ctx.strokeStyle = '#ffaa00';
+        ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
 
         ctx.beginPath();
@@ -2658,4 +2690,103 @@ class GirderSlantLeftModule extends ArenaModule {
 
         ctx.restore();
     }
+}
+
+function renderArenaHUD() {
+    const ctx = arena.ctx; // Target the physics canvas 2D context
+    if (!ctx) return;
+
+    // Standard HUD Font Settings
+    const nameFontSize = 18;
+    const statsFontSize = 13;
+    const margin = 16;
+    const lineSpacing = 22;
+
+    // Get live particle counts
+    const alphaCount = arena.particles.filter(p => p.sourceId && p.sourceId.includes('alpha')).length;
+    const betaCount  = arena.particles.filter(p => p.sourceId && p.sourceId.includes('beta')).length;
+
+    // Get live names
+    const alphaName = document.getElementById('alpha-name').innerText;
+    const betaName  = document.getElementById('beta-name').innerText;
+
+    ctx.save();
+    ctx.textBaseline = 'top';
+
+    // ------------------------------------------------------------------
+    // TOP LEFT: SOURCE ALPHA (Intrinsic Color + White Subtitle)
+    // ------------------------------------------------------------------
+    ctx.textAlign = 'left';
+
+    // Line 1: Glyph Contestant Name in Intrinsic Color
+    ctx.font = `bold ${nameFontSize}px monospace`;
+    ctx.fillStyle = alphaEngine.intrinsicColor || '#42f485';
+    ctx.fillText(alphaName, margin, margin);
+
+    // Line 2: Particles & Score in White
+    ctx.font = `${statsFontSize}px monospace`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`PARTICLES: ${alphaCount}  |  SCORE: ${scores.alphaScore}`, margin, margin + lineSpacing);
+
+
+    // ------------------------------------------------------------------
+    // TOP RIGHT: SOURCE BETA (Intrinsic Color + White Subtitle)
+    // ------------------------------------------------------------------
+    ctx.textAlign = 'right';
+
+    // Line 1: Glyph Contestant Name in Intrinsic Color
+    ctx.font = `bold ${nameFontSize}px monospace`;
+    ctx.fillStyle = betaEngine.intrinsicColor || '#00e1ff';
+    ctx.fillText(betaName, canvas.width - margin, margin);
+
+    // Line 2: Particles & Score in White
+    ctx.font = `${statsFontSize}px monospace`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`PARTICLES: ${betaCount}  |  SCORE: ${scores.betaScore}`, canvas.width - margin, margin + lineSpacing);
+
+    ctx.restore();
+}
+
+function updateAndRenderMultiplierHUD() {
+    const now = performance.now();
+
+    // Check if 10 seconds have elapsed since last double
+    if (now - lastMultiplierUpdate >= MULTIPLIER_INTERVAL_MS) {
+        scoreMultiplier *= 2;
+        lastMultiplierUpdate = now;
+    }
+
+    // Render Indicator Top Center of the Arena Canvas
+    const ctx = arena.ctx;
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    const centerX = (typeof canvas !== 'undefined' ? canvas.width : ctx.canvas.width) / 2;
+
+    // --- Main Multiplier Badge ---
+    ctx.font = 'bold 20px monospace';
+    ctx.fillStyle = '#ffcc00'; // Vibrant yellow accent
+    ctx.shadowColor = 'rgba(255, 204, 0, 0.6)';
+    ctx.shadowBlur = 8;
+
+    // Display "1x", "2x", "4x", "8x", etc.
+    ctx.fillText(`${scoreMultiplier}x`, centerX, 16);
+
+    // --- Remaining Time Subtitle ---
+    // Calculate remaining seconds (rounded up to avoid showing 0s early)
+    const elapsed = now - lastMultiplierUpdate;
+    const remainingSeconds = Math.max(0, Math.ceil((MULTIPLIER_INTERVAL_MS - elapsed) / 1000));
+
+    // Reset shadow blur so text remains crisp and clear
+    ctx.shadowBlur = 0;
+    ctx.font = '11px monospace';
+    ctx.fillStyle = '#ffffff'; // White font
+
+    // Display remaining countdown (placed directly below the 20px badge)
+    ctx.fillText(`NEXT IN ${remainingSeconds}s`, centerX, 40);
+
+    ctx.restore();
 }

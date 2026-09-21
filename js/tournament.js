@@ -1,5 +1,6 @@
 // Global glyph pool accessible across tournament functions
 let glyphPool = [];
+let autoLaunchTimer = null;
 
 // Tournament execution state tracking
 let currentTournament = {
@@ -237,6 +238,15 @@ function updateMatchupCardDOM(cardElement, match) {
  * Launches or continues a matchup (Handles Round 1 vs Round 2 positions)
  */
 function launchNextMatch() {
+
+  clearAutoLaunchTimer();
+
+  // Clear programmatically added next-match highlight class
+  const highlightedCard = document.querySelector('.matchup-card.next-match');
+  if (highlightedCard) {
+    highlightedCard.classList.remove('next-match');
+  }
+
   if (currentTournament.isFinished) {
     alert("Tournament complete! Generate a new bracket to restart.");
     return;
@@ -279,6 +289,10 @@ function launchNextMatch() {
     scores.alphaScore = 0;
     scores.betaScore = 0;
   }
+
+  window.scoreMultiplier = 1;
+  window.lastMultiplierUpdate = performance.now();
+  cancelAnimationLoop();
 
   // 2. Clear physical particles
   if (typeof arena !== 'undefined' && arena.softReset) {
@@ -402,7 +416,14 @@ function recordMatchResult(alphaScore, betaScore) {
 
   // Show tournament modal to display progress
   const tourneyModal = document.getElementById('tournamentModal');
-  if (tourneyModal) tourneyModal.classList.remove('hidden');
+  if (tourneyModal) {
+    tourneyModal.classList.remove('hidden');
+    // Start 5-second auto-launch timer if tournament is still ongoing
+    if (!currentTournament.isFinished) {
+      startAutoLaunchTimer();
+      scheduleNextMatchHover();
+    }
+  }
 }
 
 /**
@@ -413,13 +434,83 @@ function updateStatusMessage(msg) {
   if (statusEl) statusEl.innerText = msg;
 }
 
-// Attach launch handler
-document.addEventListener('DOMContentLoaded', () => {
-  const nextMatchBtn = document.getElementById('nextMatchBtn');
-  if (nextMatchBtn) {
-    nextMatchBtn.addEventListener('click', launchNextMatch);
+  // Helper to retrieve the DOM element for the next pending match
+  function getNextMatchCardDOM() {
+    if (currentTournament.isFinished || !currentTournament.rounds.length) return null;
+
+    // 1. If a match is actively in progress, highlight it
+    if (currentTournament.activeMatch) {
+      const activeMatchId = currentTournament.activeMatch.id;
+      return getDOMCardByMatchId(activeMatchId);
+    }
+
+    // 2. Otherwise find the next uncompleted match matching launchNextMatch() logic
+    const currentRoundMatches = currentTournament.rounds[currentTournament.currentRound - 1];
+    let match = currentRoundMatches ? currentRoundMatches.find(m => !m.completed) : null;
+
+    if (!match && currentTournament.currentRound < currentTournament.rounds.length) {
+      const nextRoundMatches = currentTournament.rounds[currentTournament.currentRound];
+      match = nextRoundMatches ? nextRoundMatches.find(m => !m.completed) : null;
+    }
+
+    return match ? getDOMCardByMatchId(match.id) : null;
   }
-});
+
+  // Helper to map a match object ID (e.g. "r1_m2") to its DOM card
+  function getDOMCardByMatchId(matchId) {
+    // Find card based on index matching round and match position
+    const container = document.getElementById('bracketTreeContainer');
+    if (!container) return null;
+
+    const [rStr, mStr] = matchId.split('_');
+    const rIdx = parseInt(rStr.replace('r', ''), 10) - 1;
+    const mIdx = parseInt(mStr.replace('m', ''), 10);
+
+    const columns = container.querySelectorAll('.bracket-column');
+    const totalRounds = currentTournament.rounds.length;
+
+    if (rIdx + 1 === totalRounds) {
+      const centerCol = container.querySelector('.center-final');
+      return centerCol ? centerCol.querySelector('.matchup-card') : null;
+    }
+
+    const leftCol = columns[rIdx];
+    const rightCol = columns[columns.length - 1 - rIdx];
+    const roundMatches = currentTournament.rounds[rIdx];
+    const halfMatches = roundMatches.length / 2;
+
+    if (mIdx < halfMatches) {
+      const leftCards = leftCol ? leftCol.querySelectorAll('.matchup-card') : [];
+      return leftCards[mIdx] || null;
+    } else {
+      const rightCards = rightCol ? rightCol.querySelectorAll('.matchup-card') : [];
+      return rightCards[mIdx - halfMatches] || null;
+    }
+  }
+
+  // Attach launch and hover handlers
+  document.addEventListener('DOMContentLoaded', () => {
+    const nextMatchBtn = document.getElementById('nextMatchBtn');
+    if (nextMatchBtn) {
+      nextMatchBtn.addEventListener('click', launchNextMatch);
+
+      // Add hover highlight to actual next match card
+      nextMatchBtn.addEventListener('mouseenter', () => {
+        const nextCard = getNextMatchCardDOM();
+        if (nextCard) {
+          nextCard.classList.add('next-match');
+        }
+      });
+
+      // Remove hover highlight when mouse leaves
+      nextMatchBtn.addEventListener('mouseleave', () => {
+        const highlightedCard = document.querySelector('.matchup-card.next-match');
+        if (highlightedCard) {
+          highlightedCard.classList.remove('next-match');
+        }
+      });
+    }
+  });
 
 // Base Match Data Structure
 function createMatch(matchId, playerA, playerB) {
@@ -544,4 +635,64 @@ function showCanvasRoundOverlay(text, duration = 2000) {
   setTimeout(() => {
     overlayEl.classList.remove('show');
   }, duration);
+}
+
+/**
+ * Starts a 5-second countdown to automatically trigger launchNextMatch()
+ * when the tournament modal is displayed mid-tournament.
+ */
+function startAutoLaunchTimer() {
+  clearAutoLaunchTimer();
+
+  if (currentTournament.isFinished || currentTournament.rounds.length === 0) return;
+
+  const nextBtn = document.getElementById('nextMatchBtn');
+  let secondsRemaining = 5;
+
+  const updateButtonText = () => {
+    if (nextBtn) {
+      nextBtn.innerText = `Launch Next Match (${secondsRemaining}s)`;
+    }
+  };
+
+  updateButtonText();
+
+  const intervalId = setInterval(() => {
+    secondsRemaining--;
+    if (secondsRemaining > 0) {
+      updateButtonText();
+    } else {
+      clearInterval(intervalId);
+    }
+  }, 1000);
+
+  autoLaunchTimer = setTimeout(() => {
+    clearInterval(intervalId);
+    if (nextBtn) nextBtn.innerText = "Launch Next Match";
+    launchNextMatch();
+  }, 5000);
+}
+
+/**
+ * Clears the active auto-launch timer.
+ */
+function clearAutoLaunchTimer() {
+  if (autoLaunchTimer) {
+    clearTimeout(autoLaunchTimer);
+    autoLaunchTimer = null;
+  }
+}
+
+/**
+ * Triggers a hover effect on the "Launch Next Match" button 1 second
+ * after the bracket modal opens, highlighting the upcoming matchup card.
+ */
+function scheduleNextMatchHover() {
+  setTimeout(() => {
+    const nextBtn = document.getElementById('nextMatchBtn');
+    if (nextBtn && !currentTournament.isFinished) {
+      // Programmatically trigger the mouseenter event registered in tournament_3.js
+      nextBtn.dispatchEvent(new Event('mouseenter'));
+    }
+  }, 1000);
 }

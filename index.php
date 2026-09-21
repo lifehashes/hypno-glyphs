@@ -281,9 +281,10 @@
         }
 
         .tournament-card {
-        width: 90%;
-        max-width: 1100px;
-        max-height: 85vh;
+        width: 95vw;
+        height: 95vh;
+        max-width: none;
+        max-height: none;
         background: #12131c;
         border: 1px solid #2a2d42;
         border-radius: 8px;
@@ -337,6 +338,21 @@
         gap: 4px;
         }
 
+        /* Highlight state for the next upcoming match */
+        .matchup-card.next-match {
+            border-color: #00ffff;
+            box-shadow: 0 0 8px rgba(255, 170, 0, 0.4);
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Hover highlight triggered directly or via button hover */
+        .matchup-card.next-match:hover,
+        .matchup-card.highlight-next {
+            border-color: #00ffff !important;
+            box-shadow: 0 0 16px rgba(0, 255, 255, 0.8), inset 0 0 8px rgba(0, 255, 255, 0.3) !important;
+            transform: scale(1.02);
+        }
+
         .matchup-card.active-match {
         border-color: #00e5ff;
         box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
@@ -350,7 +366,7 @@
         background: rgba(255, 255, 255, 0.03);
         border-radius: 2px;
         font-family: monospace;
-        font-size: 11px;
+        font-size: 18px;
         color: #888;
         }
 
@@ -379,7 +395,7 @@
             border:1px solid rgba(0,255,255,0.3); 
             padding:3px 6px; 
             font-family:monospace; 
-            font-size:11px; 
+            font-size:14px; 
             border-radius:3px; 
             cursor:pointer;
         }
@@ -1078,10 +1094,16 @@
     const databaseGlyphs = <?php echo json_encode($myGlyphs ?: []); ?>;
     const canvas = document.getElementById('physics-canvas');
     let isRunning = false;
+    let animFrameId = null;
 
     let matchTimeRemaining = 0; // seconds remaining
     let lastTimerTick = performance.now();
     let timerExpired = false;
+
+    // Score Multiplier System State
+    window.scoreMultiplier = 1;
+    window.lastMultiplierUpdate = performance.now();
+    const MULTIPLIER_INTERVAL_MS = 15000; // 15 seconds
 
     // Canvas arguments removed as preview canvases are dropped
     const alphaEngine = new LifeEngine(null, 16);
@@ -1324,6 +1346,9 @@
             arena.updateAndRender();
             alphaEngine.render();
             betaEngine.render();
+
+            renderArenaHUD();
+            updateAndRenderMultiplierHUD();
             updateHUD();
 
             // Check for Game Over condition match
@@ -1359,9 +1384,16 @@
             lastTimerTick = performance.now(); // Reset delta anchor when paused
             arena.renderOnly();
         }
-        requestAnimationFrame(loop);
+        animFrameId = requestAnimationFrame(loop);
     }
     loop();
+
+    function cancelAnimationLoop() {
+        if (animFrameId !== null) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+        }
+    }
 
     function toggleSimulation() {
         isRunning = !isRunning;
@@ -1371,6 +1403,13 @@
     }
 
     function clearArena() {
+
+        //cancelAnimationLoop();
+        isRunning = false;
+
+        scoreMultiplier = 1;
+        lastMultiplierUpdate = performance.now();
+
         // 1. Reset particles and arena scores
         arena.particles = [];
         scores.alphaScore = 0;
@@ -2511,37 +2550,38 @@
 
     document.addEventListener('DOMContentLoaded', () => {
 
-        initGlyphPool(databaseGlyphs);
+        // Initialize tournament glyph pool with PHP database array
+        if (typeof initGlyphPool === 'function') {
+            initGlyphPool(databaseGlyphs);
+        }
 
+        // Modal elements
         const tourneyModal = document.getElementById('tournamentModal');
         const openBtn = document.getElementById('openTourneyModalBtn');
         const closeBtn = document.getElementById('closeTourneyModalBtn');
 
-        // Open Modal
+        // Open Tournament Modal
         if (openBtn && tourneyModal) {
             openBtn.addEventListener('click', () => {
-            tourneyModal.classList.remove('hidden');
+                tourneyModal.classList.remove('hidden');
             });
         }
 
-        // Close Modal via Close Button
+        // Close Tournament Modal
         if (closeBtn && tourneyModal) {
             closeBtn.addEventListener('click', () => {
-            tourneyModal.classList.add('hidden');
+                tourneyModal.classList.add('hidden');
             });
         }
 
-        // Close Modal by clicking outside the card
+        // Close Modal on Overlay Background Click
         if (tourneyModal) {
             tourneyModal.addEventListener('click', (e) => {
-            if (e.target === tourneyModal) {
-                tourneyModal.classList.add('hidden');
-            }
+                if (e.target === tourneyModal) {
+                    tourneyModal.classList.add('hidden');
+                }
             });
         }
-
-        initBracketGenerator();
-
     });
 
     // State tracking for selected tournament size

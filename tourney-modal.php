@@ -1,3 +1,4 @@
+<!-- TOURNAMENT MODAL OVERLAY -->
 <div id="tournamentModal" class="modal-overlay hidden">
   <div class="modal-card tournament-card">
     
