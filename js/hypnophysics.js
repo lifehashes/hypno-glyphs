@@ -938,6 +938,132 @@ class ArenaManager {
 
     }
 
+    loadMap(mapData) {
+        // 1. Reset current state
+        this.particles = [];
+        this.effects = [];
+        this.clusters = [];
+        this.modules.clear();
+
+        // 2. Apply general map settings
+        if (mapData.boundaryMode) {
+            this.boundaryMode = mapData.boundaryMode;
+        }
+        if (mapData.globalGravityEnabled !== undefined) {
+            this.globalGravityEnabled = mapData.globalGravityEnabled;
+        }
+
+        // 3. Instantiate and place elements
+        if (Array.isArray(mapData.modules)) {
+            mapData.modules.forEach(data => {
+                const moduleInstance = this.createModuleFromData(data);
+                if (moduleInstance) {
+                    this.modules.set(data.id, moduleInstance);
+                }
+            });
+        }
+    }
+
+    /**
+     * Serializes all placed modules into a plain JSON-compatible array of objects.
+     */
+    getElementsPayload() {
+        const payload = [];
+        this.modules.forEach(module => {
+            if (typeof module.serialize === 'function') {
+                payload.push(module.serialize());
+            } else {
+                // Fallback basic serialization
+                payload.push({
+                    id: module.id,
+                    type: module.type,
+                    x: module.x,
+                    y: module.y,
+                    width: module.width,
+                    height: module.height
+                });
+            }
+        });
+        return payload;
+    }
+
+    /**
+     * Clears all entities (particles, modules, clusters, effects) from the simulation.
+     */
+    clearWorld() {
+        this.particles = [];
+        this.effects = [];
+        this.clusters = [];
+        this.modules.clear();
+    }
+
+    /**
+     * Restores map elements from a saved elements array.
+     */
+    loadElementsPayload(elements) {
+        if (!Array.isArray(elements)) return;
+        
+        elements.forEach(data => {
+            const moduleInstance = this.createModuleFromData(data);
+            if (moduleInstance) {
+                this.addModule(moduleInstance);
+            }
+        });
+    }
+
+    /**
+     * Factory method to instantiate modules from JSON payload data.
+     */
+    createModuleFromData(data) {
+        switch (data.type) {
+            case 'SOURCE_SPAWN':
+                return new SourceSpawnModule(data.id, data.x, data.y, data.width, data.height, null, data.label);
+            case 'ATTRACTOR':
+                return new AttractorModule(data.id, data.x, data.y, data.width, data.height, data.strength);
+            case 'SINK':
+                return new SinkModule(data.id, data.x, data.y, data.width, data.height);
+            case 'QCD_INVERTER':
+                return new QCDInverterModule(data.id, data.x, data.y, data.width, data.height);
+            case 'DOUBLER':
+                return new DoublerModule(data.id, data.x, data.y, data.width, data.height);
+            case 'CHARGER':
+                return new ChargerModule(data.id, data.x, data.y, data.width, data.height, data.polarity);
+            case 'CAPACITOR':
+                return new CapacitorModule(data.id, data.x, data.y, data.width, data.height, data.chargeVal, data.strength);
+            case 'KINETIC_CONVERTER':
+                return new KineticConverterModule(data.id, data.x, data.y, data.width, data.height, data.mode);
+            case 'BRICKS':
+                return new BricksModule(data.id, data.x, data.y, data.width, data.height, data.threshold);
+            case 'MAGNETIZER':
+                return new MagnetizerModule(data.id, data.x, data.y, data.width, data.height);
+            case 'PADDLE_WHEEL':
+                return new PaddleWheelModule(data.id, data.x, data.y, data.width, data.height, data.speedIndex, data.direction);
+            case 'WEDGE':
+                return new WedgeModule(data.id, data.x, data.y, data.width, data.height, data.orientation);
+            case 'BLOCK_SMALL':
+                return new BlockSmallModule(data.id, data.x, data.y, data.width, data.height);
+            case 'BLOCK':
+                return new BlockModule(data.id, data.x, data.y, data.width, data.height);
+            case 'BAR_H':
+                return new BarHModule(data.id, data.x, data.y, data.width, data.height);
+            case 'BAR_V':
+                return new BarVModule(data.id, data.x, data.y, data.width, data.height);
+            case 'OSMOSIS':
+                return new OsmosisModule(data.id, data.x, data.y, data.width, data.height, null, data.side);
+            case 'PREDATOR':
+                return new PredatorModule(data.id, data.x, data.y, data.width, data.height);
+            case 'CIRCLE_OBSTACLE':
+                return new CircleObstacleModule(data.id, data.x, data.y, data.width, data.height, data.radius);
+            case 'GIRDER_SLANT_RIGHT':
+                return new GirderSlantRightModule(data.id, data.x, data.y, data.width, data.height, data.speed, data.direction);
+            case 'GIRDER_SLANT_LEFT':
+                return new GirderSlantLeftModule(data.id, data.x, data.y, data.width, data.height, data.speed, data.direction);
+            default:
+                console.warn(`Unknown module type: ${data.type}`);
+                return null;
+        }
+    }
+
 }
 
 /**
@@ -1015,6 +1141,18 @@ class SinkModule extends ArenaModule {
         ctx.fillText('DRAIN SINK', c.x, this.y + 12);
         ctx.restore();
     }
+
+    serialize() {
+        return {
+            id: this.id,
+            type: this.type,
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height
+        };
+    }
+
 }
 
 /**
@@ -1275,6 +1413,13 @@ class ChargerModule extends ArenaModule {
 
     reset() {
         this.activeParticles.clear();
+    }
+
+    serialize() {
+        return {
+            ...super.serialize(),
+            polarity: this.polarity
+        };
     }
 
 }
@@ -1937,7 +2082,7 @@ class WedgeModule extends ArenaModule {
     draw(ctx) {
         super.draw(ctx);
         ctx.save();
-        ctx.fillStyle = 'rgba(255, 170, 0, 0.4)';
+        ctx.fillStyle = 'rgba(92, 88, 82, 0.4)';
         ctx.strokeStyle = '#2e2c29';
         ctx.lineWidth = 1.5;
 
@@ -1964,6 +2109,19 @@ class WedgeModule extends ArenaModule {
         ctx.stroke();
         ctx.restore();
     }
+
+    serialize() {
+        return {
+            id: this.id,
+            type: this.type,
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height,
+            orientation: this.orientation
+        };
+    }
+
 }
 
 /**

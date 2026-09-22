@@ -290,6 +290,10 @@ function launchNextMatch() {
     scores.betaScore = 0;
   }
 
+  // 1b. Reset history arrays
+  historyAlpha.length = 0;
+  historyBeta.length = 0;
+
   window.scoreMultiplier = 1;
   window.lastMultiplierUpdate = performance.now();
   cancelAnimationLoop();

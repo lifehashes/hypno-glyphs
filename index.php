@@ -52,7 +52,8 @@
     <SCRIPT SRC="js/gol.js"></SCRIPT>
     <SCRIPT SRC="js/hypnophysics.js"></SCRIPT>
     <SCRIPT SRC="js/sha256.js"></SCRIPT>
-    <SCRIPT SRC="js/tournament.js"></SCRIPT>	
+    <SCRIPT SRC="js/tournament.js"></SCRIPT>
+    <SCRIPT SRC="js/maps.js"></SCRIPT>	
     <link rel="stylesheet" href="styles.css">
     <style>
 
@@ -1009,6 +1010,9 @@
         <button class="help-btn" id="var-size-btn" onclick="toggleVariableSize()">VAR SIZE: OFF</button>
         <button class="help-btn" id="var-mass-btn" onclick="toggleVariableMass()">VAR MASS: OFF</button>
 
+        <button id="btn-save-map">Save Map</button>
+        <button id="btn-load-map">Load Map</button>
+
         <!-- MATCH TIMEOUT & OVERTIME RESOLUTION SELECTORS -->
         <div style="display:flex; align-items:center; gap:6px; color:#fff; font-family:monospace; font-size:11px; margin-left: 8px;">
             <label for="timer-select">LIMIT:</label>
@@ -1087,6 +1091,27 @@
         </div>
 
         <button class="help-btn" onclick="toggleForcesModal()" style="margin-top: 10px; width: 100%;">CLOSE</button>
+    </div>
+</div>
+
+<!-- Load Map Modal -->
+<div id="map-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <span id="closeModalBtn" class="close-btn">&times;</span>
+
+        <!-- Save View -->
+        <div id="saveMapView">
+            <h2>Save Map</h2>
+            <input type="text" id="mapNameInput" placeholder="Enter map name..." />
+            <input type="text" id="userNameInput" placeholder="Enter author name..." />
+            <button id="confirmSaveBtn">Save</button>
+        </div>
+
+        <!-- Load View -->
+        <div id="loadMapView" style="display: none;">
+            <h2>Load Map</h2>
+            <ul id="mapList"></ul>
+        </div>
     </div>
 </div>
 
@@ -2687,6 +2712,72 @@
             });
         }
     }
+
+// 1. Initialize MapManager with your physics engine instance
+const mapManager = new MapManager(arena);
+
+// 2. DOM Elements
+const modal = document.getElementById('map-modal');
+const saveView = document.getElementById('saveMapView');
+const loadView = document.getElementById('loadMapView');
+
+const btnSaveMap = document.getElementById('btn-save-map');
+const btnLoadMap = document.getElementById('btn-load-map');
+const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+const mapListContainer = document.getElementById('mapList');
+
+// 3. Open "Save Map" UI
+btnSaveMap.addEventListener('click', () => {
+    saveView.style.display = 'block';
+    loadView.style.display = 'none';
+    modal.style.display = 'flex';
+});
+
+// 4. Open "Load Map" UI & Populate Map List
+btnLoadMap.addEventListener('click', async () => {
+    saveView.style.display = 'none';
+    loadView.style.display = 'block';
+    modal.style.display = 'flex';
+
+    // Fetch available maps using MapManager
+    const maps = await mapManager.fetchMapList();
+    
+    // Render maps into UI
+    mapListContainer.innerHTML = '';
+    if (maps.length === 0) {
+        mapListContainer.innerHTML = '<li>No saved maps found.</li>';
+        return;
+    }
+
+    maps.forEach(map => {
+        const li = document.createElement('li');
+        li.textContent = `${map.map_name} (by ${map.user_name || 'Anonymous'})`;
+        li.addEventListener('click', async () => {
+            await mapManager.loadMap(map.id);
+            modal.style.display = 'none';
+        });
+        mapListContainer.appendChild(li);
+    });
+});
+
+// 5. Confirm Save Action inside Modal
+confirmSaveBtn.addEventListener('click', async () => {
+    const mapName = document.getElementById('mapNameInput').value.trim();
+    const userName = document.getElementById('userNameInput').value.trim();
+
+    if (!mapName) {
+        alert('Please enter a map name.');
+        return;
+    }
+
+    const result = await mapManager.saveMap(mapName, userName);
+    if (result && result.status === 'success') {
+        alert('Map saved successfully!');
+        modal.style.display = 'none';
+    } else {
+        alert('Failed to save map.');
+    }
+});
 
 </script>
 
