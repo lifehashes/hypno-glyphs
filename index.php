@@ -990,6 +990,15 @@
                     <span>OSMOSIS BETA</span>
                 </div>
 
+                <!-- MAZE MODULE -->
+                <div class="palette-card" draggable="true" data-type="MAZE">
+                    <svg viewBox="0 0 32 32">
+                        <rect x="4" y="4" width="24" height="24" stroke="#ffaa00" stroke-width="1.5" fill="none"/>
+                        <path d="M 4 12 H 20 M 12 20 H 28 M 20 4 V 20" stroke="#ffaa00" stroke-width="1.5" fill="none"/>
+                    </svg>
+                    <span>MAZE</span>
+                </div>
+
             </div>
         </div>
 
@@ -1668,7 +1677,9 @@
             case 'CIRCLE_OBSTACLE_M':
                 return new CircleObstacleModule(id, x, y, 20, 20, 20);
             case 'CIRCLE_OBSTACLE_L':
-                return new CircleObstacleModule(id, x, y, 40, 40, 30);       
+                return new CircleObstacleModule(id, x, y, 40, 40, 30); 
+            case 'MAZE':
+                return new MazeModule(id, x, y, width, height);      
             default:
                 return null;
         }
@@ -1708,6 +1719,7 @@
             if (type === 'CIRCLE_OBSTACLE_L') return { w: 20, h: 20 };
             if (type === 'GIRDER_H') return { w: 20, h: 120 };
             if (type === 'GIRDER_V') return { w: 20, h: 120 };
+            if (type === 'MAZE') return { w: 100, h: 100 };
             const isGranular = type.startsWith('CUSTOM_') || type.startsWith('WEDGE_') || type === 'BLOCK_SMALL';
             const isBarH = type === 'BAR_H';
             const isBarV = type === 'BAR_V';

@@ -1058,6 +1058,8 @@ class ArenaManager {
                 return new GirderSlantRightModule(data.id, data.x, data.y, data.width, data.height, data.speed, data.direction);
             case 'GIRDER_SLANT_LEFT':
                 return new GirderSlantLeftModule(data.id, data.x, data.y, data.width, data.height, data.speed, data.direction);
+            case 'MAZE':
+                return new MazeModule(data.id, data.x, data.y, data.unitSize || 80);
             default:
                 console.warn(`Unknown module type: ${data.type}`);
                 return null;
@@ -1096,12 +1098,14 @@ class SinkModule extends ArenaModule {
 
             // 1. Calculate Charge Multiplier
             const chargeMagnitude = Math.abs(particle.chargeVal);
-            const chargeMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
+            // const chargeMultiplier = chargeMagnitude > 0 ? chargeMagnitude : 1;
+            const chargeMultiplier = 1;
 
             // 2. Calculate Age Multiplier (1 Shake = 10s, minimum multiplier of 1)
-            const ageMultiplier = Math.max(1, particle.ageShakes);
+            // const ageMultiplier = Math.max(1, particle.ageShakes);
+            const ageMultiplier = 1;
 
-            // 3. Fetch Global Dynamic Time Multiplier (doubles every 10s)
+            // 3. Fetch Global Dynamic Time Multiplier (doubles every x seconds)
             const timeMultiplier = (typeof scoreMultiplier !== 'undefined') ? scoreMultiplier : 1;
 
             // 4. Compute Net Point Value
@@ -2947,4 +2951,321 @@ function updateAndRenderMultiplierHUD() {
     ctx.fillText(`NEXT IN ${remainingSeconds}s`, centerX, 40);
 
     ctx.restore();
+}
+
+/**
+ * MAZE Module (5x5 Units Footprint)
+ * Uses 16 subsection divisions per unit (80x80 total grid).
+ * Central unit (16x16 cells) is left open for the Sink module.
+ */
+class MazeModule extends ArenaModule {
+    constructor(id, x, y, unitSize = 80) {
+        const width = unitSize * 5;
+        const height = unitSize * 5;
+        super(id, x, y, width, height, 'MAZE');
+
+        this.unitSize = unitSize;
+        
+        // Pass room dimensions (e.g., a 5x5 room layout)
+        const roomsX = 20;
+        const roomsY = 20;
+
+        this.rotation = 0; // Current angle in radians
+        this.angularVelocity = 0.005; // Speed of rotation per frame
+
+        // Generate the maze and assign wallGrid directly
+        this.generateMazeGrid(roomsX, roomsY);
+    }
+
+    /**
+     * Helper to retrieve unvisited neighboring room cells during depth-first generation
+     */
+    getUnvisitedNeighbors(rx, ry, visited, roomsX, roomsY) {
+        const neighbors = [];
+        const dirs = [
+            { dr: -1, dc: 0 }, // Up
+            { dr: 1, dc: 0 },  // Down
+            { dr: 0, dc: -1 }, // Left
+            { dr: 0, dc: 1 }   // Right
+        ];
+
+        for (const { dr, dc } of dirs) {
+            const nr = ry + dr;
+            const nc = rx + dc;
+            if (nr >= 0 && nr < roomsY && nc >= 0 && nc < roomsX) {
+                if (!visited[nr][nc]) {
+                    neighbors.push({ rx: nc, ry: nr });
+                }
+            }
+        }
+        return neighbors;
+    }
+
+    /**
+     * Generates a 2D binary grid representing the maze.
+     * Leaves the central unit empty for the Sink module.
+     */
+    generateMazeGrid(roomsX = 13, roomsY = 13) {
+        // 1. Calculate Grid Dimensions based on Room Count
+        this.gridSize = roomsX * 2 + 1;
+        this.cellSize = this.width / this.gridSize;
+
+        // 2. Initialize full grid of solid walls (1)
+        this.wallGrid = Array.from({ length: this.gridSize }, () => 
+            new Array(this.gridSize).fill(1)
+        );
+
+        // 3. Track visited room cells
+        const visited = Array.from({ length: roomsY }, () => new Array(roomsX).fill(false));
+
+        const stack = [];
+        const startX = 0, startY = 0;
+        visited[startY][startX] = true;
+        
+        // Carve starting room cell
+        this.wallGrid[startY * 2 + 1][startX * 2 + 1] = 0;
+        stack.push({ rx: startX, ry: startY });
+
+        while (stack.length > 0) {
+            const current = stack[stack.length - 1];
+            const neighbors = this.getUnvisitedNeighbors(current.rx, current.ry, visited, roomsX, roomsY);
+
+            if (neighbors.length > 0) {
+                const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+
+                // Carve passage wall between cells
+                const wallR = current.ry * 2 + 1 + (next.ry - current.ry);
+                const wallC = current.rx * 2 + 1 + (next.rx - current.rx);
+                
+                this.wallGrid[wallR][wallC] = 0;
+                this.wallGrid[next.ry * 2 + 1][next.rx * 2 + 1] = 0;
+
+                visited[next.ry][next.rx] = true;
+                stack.push(next);
+            } else {
+                stack.pop();
+            }
+        }
+
+        // 4. Carve Center Chamber matching the 1-unit Sink Module footprint
+        // Find the exact geometric center of the grid
+        const centerGridIndex = Math.floor(this.gridSize / 2);
+        
+        // Calculate how many grid cells make up 1 unitSize (out of 5 total units)
+        const cellsPerUnit = this.gridSize / 5;
+        const halfUnitInCells = Math.floor(cellsPerUnit / 2);
+
+        // Clear the exact 1x1 unit box centered in the maze
+        const minR = centerGridIndex - halfUnitInCells;
+        const maxR = centerGridIndex + halfUnitInCells;
+        const minC = centerGridIndex - halfUnitInCells;
+        const maxC = centerGridIndex + halfUnitInCells;
+
+        for (let r = minR; r <= maxR; r++) {
+            for (let c = minC; c <= maxC; c++) {
+                if (r >= 0 && r < this.gridSize && c >= 0 && c < this.gridSize) {
+                    this.wallGrid[r][c] = 0;
+                }
+            }
+        }
+
+        // 5. Outer Entrances (Carve outer wall openings at exact midpoints)
+        this.wallGrid[centerGridIndex][0] = 0;                  // Left entrance
+        this.wallGrid[centerGridIndex][this.gridSize - 1] = 0;  // Right entrance
+        this.wallGrid[0][centerGridIndex] = 0;                  // Top entrance
+        this.wallGrid[this.gridSize - 1][centerGridIndex] = 0;  // Bottom entrance
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.dead) return;
+
+        // 1. Update rotation
+        if (!this.lastUpdate || performance.now() - this.lastUpdate > 16) {
+            this.rotation += this.angularVelocity;
+            this.lastUpdate = performance.now();
+        }
+
+        const radius = particle.radius || 2.5;
+
+        // Center of the maze
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        // Vector from maze center to particle in world space
+        const dx = particle.x - cx;
+        const dy = particle.y - cy;
+        
+        // Quick broad-phase bounds check
+        const distToCenterSq = dx * dx + dy * dy;
+        const maxRadius = (Math.max(this.width, this.height) / 2) * 1.5;
+        if (distToCenterSq > maxRadius * maxRadius) return;
+
+        // Angle terms (Canvas Y-down safe)
+        const cos = Math.cos(this.rotation);
+        const sin = Math.sin(this.rotation);
+
+        // Un-rotate particle position into local space
+        const localDX = dx * cos + dy * sin;
+        const localDY = -dx * sin + dy * cos;
+        const localX = localDX + this.width / 2;
+        const localY = localDY + this.height / 2;
+
+        if (localX + radius < 0 || localX - radius > this.width ||
+            localY + radius < 0 || localY - radius > this.height) {
+            return;
+        }
+
+        const RESTITUTION = 0.8;
+        const MAX_SPEED = 12;
+
+        for (let iteration = 0; iteration < 2; iteration++) {
+            // Recompute local coordinates for current iteration
+            const cdx = (particle.x - cx) * cos + (particle.y - cy) * sin;
+            const cdy = -(particle.x - cx) * sin + (particle.y - cy) * cos;
+            const curLocalX = cdx + this.width / 2;
+            const curLocalY = cdy + this.height / 2;
+
+            const centerCol = Math.floor(curLocalX / this.cellSize);
+            const centerRow = Math.floor(curLocalY / this.cellSize);
+
+            const rMin = Math.max(0, centerRow - 1);
+            const rMax = Math.min(this.gridSize - 1, centerRow + 1);
+            const cMin = Math.max(0, centerCol - 1);
+            const cMax = Math.min(this.gridSize - 1, centerCol + 1);
+
+            let collided = false;
+
+            for (let r = rMin; r <= rMax; r++) {
+                for (let c = cMin; c <= cMax; c++) {
+                    if (this.wallGrid[r][c] !== 1) continue;
+
+                    const minX = c * this.cellSize;
+                    const maxX = minX + this.cellSize;
+                    const minY = r * this.cellSize;
+                    const maxY = minY + this.cellSize;
+
+                    const pLeft   = (curLocalX + radius) - minX;  
+                    const pRight  = maxX - (curLocalX - radius);  
+                    const pTop    = (curLocalY + radius) - minY;  
+                    const pBottom = maxY - (curLocalY - radius);  
+
+                    if (pLeft > 0 && pRight > 0 && pTop > 0 && pBottom > 0) {
+                        // Ignore internal boundaries between solid wall blocks
+                        const hasLeftNeighbor   = (c > 0 && this.wallGrid[r][c - 1] === 1);
+                        const hasRightNeighbor  = (c < this.gridSize - 1 && this.wallGrid[r][c + 1] === 1);
+                        const hasTopNeighbor    = (r > 0 && this.wallGrid[r - 1][c] === 1);
+                        const hasBottomNeighbor = (r < this.gridSize - 1 && this.wallGrid[r + 1][c] === 1);
+
+                        let minOverlap = Infinity;
+                        let lnx = 0, lny = 0;
+
+                        if (!hasLeftNeighbor && pLeft < minOverlap) {
+                            minOverlap = pLeft; lnx = -1; lny = 0;
+                        }
+                        if (!hasRightNeighbor && pRight < minOverlap) {
+                            minOverlap = pRight; lnx = 1; lny = 0;
+                        }
+                        if (!hasTopNeighbor && pTop < minOverlap) {
+                            minOverlap = pTop; lnx = 0; lny = -1;
+                        }
+                        if (!hasBottomNeighbor && pBottom < minOverlap) {
+                            minOverlap = pBottom; lnx = 0; lny = 1;
+                        }
+
+                        if (minOverlap === Infinity) continue; // Inside a solid mass, skip internal face
+
+                        const overlap = minOverlap;
+
+                        // Convert local normal back to world coordinates (Y-down safe transform)
+                        const nx = lnx * cos - lny * sin;
+                        const ny = lnx * sin + lny * cos;
+
+                        // Separate particle in world space
+                        particle.x += nx * overlap;
+                        particle.y += ny * overlap;
+
+                        // Bounce velocity
+                        const dot = particle.vx * nx + particle.vy * ny;
+                        if (dot < 0) {
+                            particle.vx -= (1 + RESTITUTION) * dot * nx;
+                            particle.vy -= (1 + RESTITUTION) * dot * ny;
+                        }
+
+                        // Rotational drag / wall friction
+                        const wallVelX = -cdy * this.angularVelocity; 
+                        const wallVelY = cdx * this.angularVelocity;
+                        const wvx = wallVelX * cos - wallVelY * sin;
+                        const wvy = wallVelX * sin + wallVelY * cos;
+                        
+                        particle.vx += wvx * 0;
+                        particle.vy += wvy * 0;
+
+                        // Centrifugal acceleration pulling particles outward relative to rotation center
+                        const centrifugalStrength = Math.pow(this.angularVelocity, 2)*0;
+                        particle.vx += dx * centrifugalStrength * dt;
+                        particle.vy += dy * centrifugalStrength * dt;
+
+                        collided = true;
+                        break;
+                    }
+                }
+                if (collided) break;
+            }
+
+            if (!collided) break;
+        }
+
+        // Clamp speed
+        const speed = Math.hypot(particle.vx, particle.vy);
+        if (speed > MAX_SPEED) {
+            particle.vx = (particle.vx / speed) * MAX_SPEED;
+            particle.vy = (particle.vy / speed) * MAX_SPEED;
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        ctx.save();
+
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        ctx.translate(cx, cy);
+        ctx.rotate(this.rotation);
+        // Translate back by half width/height because we draw from 0,0 locally
+        ctx.translate(-this.width / 2, -this.height / 2);
+
+        ctx.fillStyle = '#00e5ff';
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = '#00e5ff';
+
+        for (let r = 0; r < this.gridSize; r++) {
+            for (let c = 0; c < this.gridSize; c++) {
+                if (this.wallGrid[r][c] === 1) {
+                    const wx = c * this.cellSize;
+                    const wy = r * this.cellSize;
+                    ctx.fillRect(wx, wy, this.cellSize, this.cellSize);
+                }
+            }
+        }
+
+        const centerStart = (this.width / 2) - (this.unitSize / 2);
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(centerStart, centerStart, this.unitSize, this.unitSize);
+
+        ctx.restore();
+    }
+
+    serialize() {
+        return {
+            id: this.id,
+            type: this.type,
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height
+        };
+    }
 }
