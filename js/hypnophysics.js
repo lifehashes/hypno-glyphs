@@ -448,6 +448,9 @@ class ArenaManager {
         this.globalGravityEnabled = false;
         this.globalGravityForce = 300; // Adjust force intensity as desired
 
+        this.uniformBFieldEnabled = false;
+        this.uniformBField = 1.0; // Positive = Out of plane (.), Negative = Into plane (X)
+
         this.setupParticleTrackingInteraction();
 
     }
@@ -496,6 +499,43 @@ class ArenaManager {
                 closestParticle.isTracked = !closestParticle.isTracked;
             }
         });
+    }
+
+    applyUniformMagneticField(dt) {
+        if (!this.uniformBFieldEnabled || this.uniformBField === 0) return;
+
+        const Bz = this.uniformBField;
+
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+
+            // Skip dead particles or neutral/zero-charge particles (like predators)
+            if (p.dead || !p.chargeVal || p.chargeVal === 0 || p.mass <= 0) continue;
+
+            const q = p.chargeVal;
+
+            // F_x = q * v_y * B_z
+            // F_y = -q * v_x * B_z
+            const ax = (q * p.vy * Bz) / p.mass;
+            const ay = (-q * p.vx * Bz) / p.mass;
+
+            // Apply acceleration directly to particle velocities for timestep dt
+            p.vx += ax * dt;
+            p.vy += ay * dt;
+        }
+    }
+
+    drawUniformBFieldIndicator(ctx) {
+        if (!this.uniformBFieldEnabled || this.uniformBField === 0) return;
+
+        ctx.save();
+        ctx.fillStyle = this.uniformBField > 0 ? "rgba(0, 200, 255, 0.15)" : "rgba(255, 100, 0, 0.15)";
+        ctx.font = "14px monospace";
+
+        const symbol = this.uniformBField > 0 ? "☉ Out of Plane (+B)" : "⊗ Into Plane (-B)";
+        ctx.fillText(`B-Field: ${symbol} (${this.uniformBField.toFixed(2)} T)`, 15, 60);
+
+        ctx.restore();
     }
 
     handleParticleBoundaries(p) {
@@ -636,6 +676,9 @@ class ArenaManager {
                 this.effects.splice(i, 1);
             }
         }
+
+        // 4. Apply Lorentz force (magnetic component only)
+        this.applyUniformMagneticField(dt);
 
         this.drawBoundaryVisuals();
         this.modules.forEach(mod => mod.draw(this.ctx));
