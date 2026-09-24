@@ -2564,14 +2564,77 @@
         // If tournament match active, record result into bracket engine
         if (typeof currentTournament !== 'undefined' && currentTournament.activeMatch) {
             recordMatchResult(scores.alphaScore, scores.betaScore);
-        } else {
+        } 
+        if (1 === 1) {
             // Float overlay up for individual/skirmish mode
-            document.getElementById('game-over-overlay').classList.add('active');
+            showGameOverModal();
         }
     }
 
+    let scorecardTimer = null;
+
+    function showGameOverModal() {
+        // 1. Show the overlay
+        document.getElementById('game-over-overlay').classList.add('active');
+
+        // 2. Setup 4-second countdown
+        let secondsRemaining = 4;
+        const btn = document.querySelector('.scorecard-dismiss-btn');
+        
+        if (btn) {
+            btn.textContent = `CONTINUE (${secondsRemaining})`;
+        }
+
+        // Clear any previously running timer to prevent overlapping intervals
+        if (scorecardTimer) clearInterval(scorecardTimer);
+
+        scorecardTimer = setInterval(() => {
+            secondsRemaining--;
+
+            if (secondsRemaining > 0) {
+                if (btn) btn.textContent = `CONTINUE (${secondsRemaining})`;
+            } else {
+                // Time expired: dismiss modal and proceed
+                dismissGameOver();
+            }
+        }, 1000);
+    }
+
     function dismissGameOver() {
+        // 1. Stop active score card countdown
+        if (scorecardTimer) {
+            clearInterval(scorecardTimer);
+            scorecardTimer = null;
+        }
+
+        // 2. Reset button label
+        const btn = document.querySelector('.scorecard-dismiss-btn');
+        if (btn) {
+            btn.textContent = 'CONTINUE';
+        }
+
+        // 3. Hide the score card overlay
         document.getElementById('game-over-overlay').classList.remove('active');
+
+        // 4. Handle post-match flow
+        if (typeof currentTournament !== 'undefined') {
+            // CASE A: Leg 1 ended, start Leg 2
+            if (currentTournament.activeMatch && currentTournament.activeMatch.subRound === 1 && !currentTournament.activeMatch.completed) {
+                launchNextMatch();
+            } 
+            // CASE B: Full match ended (activeMatch is null), reveal bracket modal
+            else if (!currentTournament.activeMatch) {
+                const tourneyModal = document.getElementById('tournamentModal');
+                if (tourneyModal) {
+                    tourneyModal.classList.remove('hidden');
+                }
+
+                if (!currentTournament.isFinished) {
+                    if (typeof startAutoLaunchTimer === 'function') startAutoLaunchTimer();
+                    if (typeof scheduleNextMatchHover === 'function') scheduleNextMatchHover();
+                }
+            }
+        }
     }
 
     function updateGlyphColorStyling(source, color) {

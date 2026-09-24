@@ -374,9 +374,11 @@ function recordMatchResult(alphaScore, betaScore) {
     updateStatusMessage(`Leg 1 finished! Preparing Leg 2 (Swapping Positions)...`);
     
     // Short delay before automatically starting Leg 2
+    /*
     setTimeout(() => {
       launchNextMatch();
     }, 1000);
+    */
 
     return; // Stop here; do not declare a winner yet
   }
@@ -419,6 +421,7 @@ function recordMatchResult(alphaScore, betaScore) {
   renderBracketUI();
 
   // Show tournament modal to display progress
+  /*
   const tourneyModal = document.getElementById('tournamentModal');
   if (tourneyModal) {
     tourneyModal.classList.remove('hidden');
@@ -428,6 +431,8 @@ function recordMatchResult(alphaScore, betaScore) {
       scheduleNextMatchHover();
     }
   }
+  */
+ 
 }
 
 /**
@@ -580,6 +585,7 @@ class MatchRunner {
   // Finalize current sub-round and transition to Round 2 or Complete
   onSubRoundEnd(match, baseEmitters, roundScoreA, roundScoreB) {
     const roundIdx = match.currentRound;
+    console.log("[tournament.js] MatchRunner{}: onSubRoundEnd(): Hi!");
     
     // Record scores for the active round
     match.scores.A[roundIdx] = roundScoreA;
