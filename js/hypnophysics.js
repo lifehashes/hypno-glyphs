@@ -2874,6 +2874,25 @@ function renderArenaHUD() {
     const alphaName = document.getElementById('alpha-name').innerText;
     const betaName  = document.getElementById('beta-name').innerText;
 
+    // Determine if we are in Leg 2 (subRound 1) of a tournament match to pull Leg 1 scores
+    let alphaPrevText = "";
+    let betaPrevText = "";
+
+    if (typeof currentTournament !== 'undefined' && currentTournament.activeMatch) {
+        const match = currentTournament.activeMatch;
+        
+        if (match.subRound === 1) {
+            // Note: In Leg 2, Glyph positions are swapped in the engines:
+            // - Alpha engine is running match.p2 (Leg 1 score stored in p2Scores[0])
+            // - Beta engine is running match.p1 (Leg 1 score stored in p1Scores[0])
+            const alphaL1 = match.p2Scores ? match.p2Scores[0] : 0;
+            const betaL1  = match.p1Scores ? match.p1Scores[0] : 0;
+
+            alphaPrevText = ` (R1: ${alphaL1})`;
+            betaPrevText  = ` (R1: ${betaL1})`;
+        }
+    }
+
     ctx.save();
     ctx.textBaseline = 'top';
 
@@ -2887,11 +2906,10 @@ function renderArenaHUD() {
     ctx.fillStyle = alphaEngine.intrinsicColor || '#42f485';
     ctx.fillText(alphaName, margin, margin);
 
-    // Line 2: Particles & Score in White
+    // Line 2: Particles & Score in White (includes Leg 1 score during Leg 2)
     ctx.font = `${statsFontSize}px monospace`;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`PARTICLES: ${alphaCount}  |  SCORE: ${scores.alphaScore}`, margin, margin + lineSpacing);
-
+    ctx.fillText(`PARTICLES: ${alphaCount}  |  SCORE: ${scores.alphaScore}${alphaPrevText}`, margin, margin + lineSpacing);
 
     // ------------------------------------------------------------------
     // TOP RIGHT: SOURCE BETA (Intrinsic Color + White Subtitle)
@@ -2903,10 +2921,10 @@ function renderArenaHUD() {
     ctx.fillStyle = betaEngine.intrinsicColor || '#00e1ff';
     ctx.fillText(betaName, canvas.width - margin, margin);
 
-    // Line 2: Particles & Score in White
+    // Line 2: Particles & Score in White (includes Leg 1 score during Leg 2)
     ctx.font = `${statsFontSize}px monospace`;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`PARTICLES: ${betaCount}  |  SCORE: ${scores.betaScore}`, canvas.width - margin, margin + lineSpacing);
+    ctx.fillText(`PARTICLES: ${betaCount}  |  SCORE: ${scores.betaScore}${betaPrevText}`, canvas.width - margin, margin + lineSpacing);
 
     ctx.restore();
 }

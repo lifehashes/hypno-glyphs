@@ -432,7 +432,7 @@ function recordMatchResult(alphaScore, betaScore) {
     }
   }
   */
- 
+
 }
 
 /**
@@ -657,7 +657,7 @@ function startAutoLaunchTimer() {
   if (currentTournament.isFinished || currentTournament.rounds.length === 0) return;
 
   const nextBtn = document.getElementById('nextMatchBtn');
-  let secondsRemaining = 5;
+  let secondsRemaining = 10;
 
   const updateButtonText = () => {
     if (nextBtn) {
@@ -680,7 +680,7 @@ function startAutoLaunchTimer() {
     clearInterval(intervalId);
     if (nextBtn) nextBtn.innerText = "Launch Next Match";
     launchNextMatch();
-  }, 5000);
+  }, 10000);
 }
 
 /**
@@ -704,5 +704,5 @@ function scheduleNextMatchHover() {
       // Programmatically trigger the mouseenter event registered in tournament_3.js
       nextBtn.dispatchEvent(new Event('mouseenter'));
     }
-  }, 1000);
+  }, 5000);
 }
