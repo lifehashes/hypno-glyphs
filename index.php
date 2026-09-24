@@ -999,6 +999,15 @@
                     <span>MAZE</span>
                 </div>
 
+                <!-- FLIP MODULE -->
+                <div class="palette-card" draggable="true" data-type="FLIP_MODULE">
+                    <svg viewBox="0 0 32 32">
+                        <path d="M 8 16 Q 16 6 24 16 Q 16 26 8 16" stroke="#00ffff" stroke-width="1.5" fill="none"/>
+                        <path d="M 12 16 L 20 16 M 17 13 L 20 16 L 17 19" stroke="#00ffff" stroke-width="1.5" fill="none"/>
+                    </svg>
+                    <span>FLIPPER</span>
+                </div>
+
             </div>
         </div>
 
@@ -1680,6 +1689,8 @@
                 return new CircleObstacleModule(id, x, y, 40, 40, 30); 
             case 'MAZE':
                 return new MazeModule(id, x, y, width, height);      
+            case 'FLIP_MODULE':
+                return new FlipModule(id, x, y, width, height);
             default:
                 return null;
         }

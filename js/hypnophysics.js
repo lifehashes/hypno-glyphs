@@ -1060,6 +1060,8 @@ class ArenaManager {
                 return new GirderSlantLeftModule(data.id, data.x, data.y, data.width, data.height, data.speed, data.direction);
             case 'MAZE':
                 return new MazeModule(data.id, data.x, data.y, data.unitSize || 80);
+            case 'FLIP_MODULE':
+                return new FlipModule(data.id, data.x, data.y, data.width, data.height, data.orientation);
             default:
                 console.warn(`Unknown module type: ${data.type}`);
                 return null;
@@ -3266,6 +3268,174 @@ class MazeModule extends ArenaModule {
             y: this.y,
             width: this.width,
             height: this.height
+        };
+    }
+}
+
+/**
+ * Flip Module
+ * Standard-sized module containing a diagonal barrier that flips its orientation 
+ * between "Top-Left to Bottom-Right" and "Bottom-Left to Top-Right" every 2 seconds.
+ */
+class FlipModule extends ArenaModule {
+    constructor(id, x, y, width = 80, height = 80, initialOrientation = 'TL_BR') {
+        super(id, x, y, width, height, 'FLIP_MODULE');
+        
+        // Orientation state: 'TL_BR' (Top-Left to Bottom-Right) or 'BL_TR' (Bottom-Left to Top-Right)
+        this.orientation = initialOrientation;
+        
+        // Timer logic (2.0s interval)
+        this.timer = 0;
+        this.interval = 2.0;
+
+        // Visual animation angle (0 rad = TL_BR diagonal, PI/2 rad = BL_TR diagonal)
+        this.targetAngle = this.orientation === 'TL_BR' ? 0 : Math.PI / 2;
+        this.currentAngle = this.targetAngle;
+    }
+
+    update(dt) {
+        // 1. Advance timer & trigger orientation flip every 2 seconds
+        this.timer += dt;
+        if (this.timer >= this.interval) {
+            this.timer %= this.interval;
+            this.orientation = (this.orientation === 'TL_BR') ? 'BL_TR' : 'TL_BR';
+            this.targetAngle = (this.orientation === 'TL_BR') ? 0 : Math.PI / 2;
+        }
+
+        // 2. Smoothly interpolate visual angle towards target orientation
+        const lerpSpeed = 10.0;
+        this.currentAngle += (this.targetAngle - this.currentAngle) * Math.min(1, dt * lerpSpeed);
+    }
+
+    /**
+     * Retrieves the endpoints of the current physical diagonal barrier segment.
+     */
+    getEndpoints() {
+        const halfW = this.width / 2;
+        const halfH = this.height / 2;
+        const c = this.center;
+
+        // Rotate baseline diagonal vector (-halfW, -halfH) -> (halfW, halfH) by currentAngle
+        const cos = Math.cos(this.currentAngle);
+        const sin = Math.sin(this.currentAngle);
+
+        const x1 = c.x + (-halfW * cos - -halfH * sin);
+        const y1 = c.y + (-halfW * sin + -halfH * cos);
+
+        const x2 = c.x + (halfW * cos - halfH * sin);
+        const y2 = c.y + (halfW * sin + halfH * cos);
+
+        return { p1: { x: x1, y: y1 }, p2: { x: x2, y: y2 } };
+    }
+
+    affectParticle(particle, dt) {
+        if (particle.dead) return;
+
+        // Fast bounding box check
+        if (particle.x < this.x - particle.radius || particle.x > this.x + this.width + particle.radius ||
+            particle.y < this.y - particle.radius || particle.y > this.y + this.height + particle.radius) {
+            return;
+        }
+
+        const { p1, p2 } = this.getEndpoints();
+        const pRadius = particle.radius || 2.5;
+
+        // Line segment vector
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return;
+
+        // Project particle center onto segment to find closest point t [0, 1]
+        let t = ((particle.x - p1.x) * dx + (particle.y - p1.y) * dy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+
+        const closestX = p1.x + t * dx;
+        const closestY = p1.y + t * dy;
+
+        // Distance vector from closest point on segment to particle center
+        const distX = particle.x - closestX;
+        const distY = particle.y - closestY;
+        const distSq = distX * distX + distY * distY;
+
+        // Collision check against barrier line thickness
+        const barrierThickness = 3.0;
+        const minDist = pRadius + barrierThickness;
+
+        if (distSq < minDist * minDist && distSq > 0) {
+            const dist = Math.sqrt(distSq);
+            
+            // Collision Normal
+            const nx = distX / dist;
+            const ny = distY / dist;
+
+            // Nudge particle out of the barrier geometry
+            const overlap = minDist - dist;
+            particle.x += nx * (overlap + 0.5);
+            particle.y += ny * (overlap + 0.5);
+
+            // Reflect velocity: V_new = V - 2*(V . N)*N
+            const dot = particle.vx * nx + particle.vy * ny;
+            if (dot < 0) {
+                particle.vx -= 2 * dot * nx;
+                particle.vy -= 2 * dot * ny;
+            }
+        }
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        const c = this.center;
+        const { p1, p2 } = this.getEndpoints();
+
+        ctx.save();
+        
+        // Dynamic color pulse based on swap proximity
+        const warningProgress = this.timer / this.interval;
+        const color = warningProgress > 0.8 ? '#ffcc00' : '#00e1ff';
+
+        ctx.strokeStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.lineWidth = 3;
+
+        // Draw diagonal element line
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+
+        // Central pivot point
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Module Label
+        ctx.font = '9px monospace';
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.fillText('FLIPPER', c.x, this.y + 12);
+
+        ctx.restore();
+    }
+
+    reset() {
+        this.timer = 0;
+        this.orientation = 'TL_BR';
+        this.targetAngle = 0;
+        this.currentAngle = 0;
+    }
+
+    serialize() {
+        return {
+            id: this.id,
+            type: this.type,
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height,
+            orientation: this.orientation
         };
     }
 }
