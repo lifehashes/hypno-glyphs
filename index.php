@@ -1025,11 +1025,13 @@
         <!-- Boundary Mode Selector Button -->
         <button class="help-btn" id="boundary-btn" onclick="cycleBoundaryMode()" style="min-width: 170px;">BOUNDARIES: NONE</button>
 
+        <button class="help-btn" id="converter-btn" onclick="toggleConverters()">CNV: OFF</button>
+
         <button class="help-btn" id="var-size-btn" onclick="toggleVariableSize()">VAR SIZE: OFF</button>
         <button class="help-btn" id="var-mass-btn" onclick="toggleVariableMass()">VAR MASS: OFF</button>
 
-        <button id="btn-save-map">Save Map</button>
-        <button id="btn-load-map">Load Map</button>
+        <button class="help-btn" id="btn-save-map">Save Map</button>
+        <button class="help-btn" id="btn-load-map">Load Map</button>
 
         <!-- MATCH TIMEOUT & OVERTIME RESOLUTION SELECTORS -->
         <div style="display:flex; align-items:center; gap:6px; color:#fff; font-family:monospace; font-size:11px; margin-left: 8px;">
@@ -2864,6 +2866,35 @@ confirmSaveBtn.addEventListener('click', async () => {
         alert('Failed to save map.');
     }
 });
+
+let globalConverterFlag = false;
+
+function toggleConverters() {
+    // console.log(`toggleConverter(): Hello!`);
+    const btn = document.getElementById('converter-btn');
+    if (!btn) return;
+
+    // Check current state from the button text or a global/arena flag
+    const isCurrentlyOn = btn.innerText.includes('ON');
+    const newState = !isCurrentlyOn;
+
+    // 1. Toggle the attribute across all active particles in the arena
+    /*
+    if (typeof arena !== 'undefined' && Array.isArray(arena.particles)) {
+        arena.particles.forEach(p => {
+            p.isConverter = newState;
+        });
+    }
+    */
+    globalConverterFlag = !globalConverterFlag;
+
+    // 2. Update button label and visual state
+    if (newState) {
+        btn.innerText = 'CNV: ON';
+    } else {
+        btn.innerText = 'CNV: OFF';
+    }
+}
 
 </script>
 

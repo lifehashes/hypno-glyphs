@@ -3,7 +3,7 @@
  * Simple physical entities that move through the arena.
  */
 class Particle {
-    constructor(x, y, vx, vy, charge = 1, color = '#ffffff', radius = 2.5, mass = 1.0, isPredator = false) {
+    constructor(x, y, vx, vy, charge = 1, color = '#ffffff', radius = 2.5, mass = 1.0, isPredator = false, isConverter = globalConverterFlag) {
         // Core spatial & physical properties
         this.x = x;
         this.y = y;
@@ -35,7 +35,10 @@ class Particle {
         // Track Predator status
         this.isPredator = isPredator;
         this.life = 1.0;
-        this.dead = false;        
+        this.dead = false;    
+        
+        // Track converter status
+        this.isConverter = isConverter;
 
     }
 
@@ -705,6 +708,25 @@ class ArenaManager {
 
                 if (distSq < minDistSq && distSq > 0) {
                     
+                    // --- CONVERTER LOGIC START ---
+                    // Ensure particles belong to different sides/spawners
+                    if (p1.sourceId !== undefined && p2.sourceId !== undefined && p1.sourceId !== p2.sourceId) {
+                        const v1Sq = p1.vx * p1.vx + p1.vy * p1.vy;
+                        const v2Sq = p2.vx * p2.vx + p2.vy * p2.vy;
+
+                        // Case A: Particle 1 converts Particle 2
+                        if (p1.isConverter && v1Sq > v2Sq) {
+                            p2.sourceId = p1.sourceId;
+                            p2.color = p1.color; // Optionally update color to match the new side
+                        } 
+                        // Case B: Particle 2 converts Particle 1
+                        else if (p2.isConverter && v2Sq > v1Sq) {
+                            p1.sourceId = p2.sourceId;
+                            p1.color = p2.color; // Optionally update color to match the new side
+                        }
+                    }
+                    // --- CONVERTER LOGIC END ---
+
                     // ==========================================
                     // PREDATOR INTERACTION & FEEDING LOGIC
                     // ==========================================
