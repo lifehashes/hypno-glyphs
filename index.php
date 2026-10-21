@@ -34,7 +34,7 @@
             g.HASH,
             g.GRID_SIZE
         FROM GLYPHREG g
-        WHERE g.OWNER = :owner_id AND g.GRID_SIZE='16' AND g.ITERATIONS>=100 AND g.ITERATIONS<=120
+        WHERE g.OWNER = :owner_id AND g.GRID_SIZE='16' AND g.ITERATIONS>=700 AND g.ITERATIONS<=799
         GROUP BY g.BATTLE_NAME, g.ITERATIONS, g.PEAK, g.MAX, g.OWNER, g.BIN, g.HASH, g.GRID_SIZE
         ORDER BY g.BATTLE_NAME ASC
     ");
