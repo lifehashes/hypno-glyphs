@@ -1110,6 +1110,23 @@
             <span id="drag-val-display">0.50</span>
         </div>
 
+        <!-- Score Doubling Interval Slider -->
+        <div class="forces-row">
+            <div class="forces-row-label">
+                <label for="doubling-slider">Score Doubling Interval:</label>
+                <span id="doubling-val">15s</span>
+            </div>
+            <input 
+                type="range" 
+                id="doubling-slider" 
+                min="0" 
+                max="60" 
+                step="5" 
+                value="15" 
+                oninput="updateDoublingInterval(this.value)"
+            >
+        </div>
+
         <button class="help-btn" onclick="toggleForcesModal()" style="margin-top: 10px; width: 100%;">CLOSE</button>
     </div>
 </div>
@@ -1145,10 +1162,29 @@
     let lastTimerTick = performance.now();
     let timerExpired = false;
 
-    // Score Multiplier System State
+    // Dynamic multiplier interval state variables
     window.scoreMultiplier = 1;
     window.lastMultiplierUpdate = performance.now();
-    const MULTIPLIER_INTERVAL_MS = 15000; // 15 seconds
+    
+    window.multiplierIntervalSecs = 15;
+    window.MULTIPLIER_INTERVAL_MS = 15000; // 15 seconds by default
+    window.isDoublingInfinite = false;
+
+    function updateDoublingInterval(val) {
+        const secs = parseInt(val, 10);
+        const labelElem = document.getElementById('doubling-val');
+        
+        if (secs === 0) {
+            window.isDoublingInfinite = true;
+            window.MULTIPLIER_INTERVAL_MS = Infinity;
+            if (labelElem) labelElem.innerText = "OFF (INFINITE)";
+        } else {
+            window.isDoublingInfinite = false;
+            window.multiplierIntervalSecs = secs;
+            window.MULTIPLIER_INTERVAL_MS = secs * 1000;
+            if (labelElem) labelElem.innerText = `${secs}s`;
+        }
+    }
 
     // Canvas arguments removed as preview canvases are dropped
     const alphaEngine = new LifeEngine(null, 16);

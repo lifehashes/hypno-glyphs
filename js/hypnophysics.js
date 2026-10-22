@@ -2997,10 +2997,12 @@ function renderArenaHUD() {
 function updateAndRenderMultiplierHUD() {
     const now = performance.now();
 
-    // Check if 10 seconds have elapsed since last double
-    if (now - lastMultiplierUpdate >= MULTIPLIER_INTERVAL_MS) {
-        scoreMultiplier *= 2;
-        lastMultiplierUpdate = now;
+    // Only check for doubling if the interval is not set to infinite/off
+    if (!window.isDoublingInfinite) {
+        if (now - lastMultiplierUpdate >= MULTIPLIER_INTERVAL_MS) {
+            scoreMultiplier *= 2;
+            lastMultiplierUpdate = now;
+        }
     }
 
     // Render Indicator Top Center of the Arena Canvas
@@ -3022,18 +3024,22 @@ function updateAndRenderMultiplierHUD() {
     // Display "1x", "2x", "4x", "8x", etc.
     ctx.fillText(`${scoreMultiplier}x`, centerX, 16);
 
-    // --- Remaining Time Subtitle ---
-    // Calculate remaining seconds (rounded up to avoid showing 0s early)
-    const elapsed = now - lastMultiplierUpdate;
-    const remainingSeconds = Math.max(0, Math.ceil((MULTIPLIER_INTERVAL_MS - elapsed) / 1000));
-
-    // Reset shadow blur so text remains crisp and clear
+    // --- Subtitle (Countdown or OFF status) ---
     ctx.shadowBlur = 0;
     ctx.font = '11px monospace';
     ctx.fillStyle = '#ffffff'; // White font
 
-    // Display remaining countdown (placed directly below the 20px badge)
-    ctx.fillText(`NEXT IN ${remainingSeconds}s`, centerX, 40);
+    if (window.isDoublingInfinite) {
+        // Display "OFF" when score doubling is disabled
+        ctx.fillText('OFF', centerX, 40);
+    } else {
+        // Calculate remaining seconds (rounded up to avoid showing 0s early)
+        const elapsed = now - lastMultiplierUpdate;
+        const remainingSeconds = Math.max(0, Math.ceil((MULTIPLIER_INTERVAL_MS - elapsed) / 1000));
+
+        // Display remaining countdown (placed directly below the 20px badge)
+        ctx.fillText(`NEXT IN ${remainingSeconds}s`, centerX, 40);
+    }
 
     ctx.restore();
 }
