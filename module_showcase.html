@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypnophysics Arena - Module Showcase & Tactical Analyzer</title>
+    <style>
+        :root {
+            --bg-black: #050505;
+            --panel-bg: rgba(20, 20, 20, 0.85);
+            --accent-green: #42f485;
+            --frame-grey: #666;
+            --text-dim: #888;
+            --accent-cyan: #00ffff;
+            --alert-red: #ff3333;
+            --accent-magenta: #e040fb;
+            --accent-orange: #ff9800;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        html, body {
+            height: 100vh;
+            margin: 0;
+            padding: 10px;
+            overflow: hidden; /* Prevents window scrollbars entirely */
+            background-color: var(--bg-black);
+            color: #eee;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Fixed-height flex column filling exact viewport height */
+        .outer-frame {
+            border: 1px solid var(--frame-grey);
+            padding: 12px;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            position: relative;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--frame-grey);
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .terminal-title {
+            font-size: 1.1rem;
+            letter-spacing: 3px;
+            color: var(--accent-green);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .terminal-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+
+        /* Main stage expands to fill all remaining vertical space */
+        .duel-stage {
+            display: flex;
+            align-items: stretch;
+            gap: 10px;
+            flex: 1;
+            min-height: 0; /* Critical for inner flex scrolling/scaling */
+            margin-bottom: 10px;
+        }
+
+        .player-box {
+            flex: 0 0 290px;
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 8px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .pane-title {
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            border-bottom: 1px solid var(--accent-green);
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .module-nav-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow-y: auto;
+            padding-right: 4px;
+            flex: 1;
+        }
+
+        .nav-category {
+            font-size: 0.7rem;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 8px;
+            margin-bottom: 2px;
+            padding-left: 4px;
+            border-left: 2px solid var(--accent-cyan);
+        }
+
+        .module-item-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #bbb;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            padding: 6px 8px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border-radius: 2px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .module-item-btn:hover {
+            border-color: var(--accent-green);
+            color: #fff;
+            background: rgba(66, 244, 133, 0.08);
+            padding-left: 12px;
+        }
+
+        .module-item-btn.active {
+            background: rgba(66, 244, 133, 0.18);
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(66, 244, 133, 0.2);
+        }
+
+        .arena-container {
+            flex: 1;
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .viewport-header-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: rgba(5, 5, 5, 0.75);
+            padding: 6px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            border-radius: 3px;
+        }
+
+        .viewport-tag {
+            font-size: 0.75rem;
+            color: var(--accent-cyan);
+            letter-spacing: 1.5px;
+            font-weight: bold;
+        }
+
+        #physics-canvas {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #0f1215 0%, #030303 100%);
+            display: block;
+            cursor: crosshair;
+        }
+
+        .stat-line {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+        }
+
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .stat-value.cyan { color: var(--accent-cyan); }
+        .stat-value.green { color: var(--accent-green); }
+        .stat-value.magenta { color: var(--accent-magenta); }
+
+        .tactical-desc {
+            font-size: 0.75rem;
+            line-height: 1.4;
+            color: #ccc;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px;
+            border-radius: 3px;
+            overflow-y: auto;
+            flex: 1;
+            margin-top: 6px;
+        }
+
+        .controls-bar {
+            display: flex;
+            gap: 10px;
+            flex-shrink: 0;
+            align-items: center;
+            background: rgba(15, 15, 15, 0.8);
+            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .load-btn, .start-btn, .help-btn, .opt-btn {
+            background: transparent;
+            border: 1px solid var(--frame-grey);
+            color: white;
+            font-family: 'Courier New', monospace;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.75rem;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .load-btn:hover, .opt-btn:hover {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            background: rgba(66, 244, 133, 0.05);
+        }
+
+        .start-btn {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            letter-spacing: 1.5px;
+            font-weight: bold;
+        }
+
+        .start-btn:hover {
+            background: rgba(66, 244, 133, 0.15);
+            box-shadow: 0 0 10px rgba(66, 244, 133, 0.3);
+        }
+
+        .start-btn.active-spawner {
+            background: var(--accent-green);
+            color: #000;
+            box-shadow: 0 0 15px rgba(66, 244, 133, 0.6);
+        }
+
+        .help-btn {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            letter-spacing: 1px;
+        }
+
+        .help-btn:hover {
+            border-color: var(--accent-cyan);
+            color: #000000;
+            background: var(--accent-cyan);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        /* Custom Range Slider */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-left: auto;
+        }
+
+        .slider-container input[type=range] {
+            accent-color: var(--accent-green);
+            cursor: pointer;
+            width: 90px;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid rgba(255, 255, 255, 0.1); }
+        ::-webkit-scrollbar-thumb { background: #222; border: 1px solid rgba(66, 244, 133, 0.2); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-green); }
+
+        .pulse-green {
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(66, 244, 133, 0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(66, 244, 133, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(66, 244, 133, 0); }
+        }
+
+        /* Module Parameter Interactive Box */
+        .param-box {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 8px;
+            margin-top: 4px;
+        }
+
+        .param-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+        }
+
+        .toggle-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--frame-grey);
+            color: #fff;
+            padding: 2px 8px;
+            font-family: inherit;
+            font-size: 0.7rem;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        .toggle-btn.on {
+            background: rgba(66, 244, 133, 0.2);
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="outer-frame">
+        <!-- Terminal Header -->
+        <div class="terminal-header">
+            <div class="terminal-title">
+                <span>HYPNO-PHYSICS</span>
+                <span style="color: #666;">//</span>
+                <span style="color: var(--accent-cyan); font-size: 0.9rem;">MODULE TACTICAL INSPECTOR</span>
+            </div>
+            <div class="terminal-subtitle">HD RECORDING SUITE & INTERACTIVE SIMULATION</div>
+        </div>
+
+        <!-- Main Stage -->
+        <div class="duel-stage">
+            
+            <!-- Left Sidebar: Module Selector Browser -->
+            <div class="player-box">
+                <div class="pane-title">
+                    <span>MODULE REGISTRY</span>
+                    <span id="module-count-tag" style="font-size: 0.7rem; color: var(--text-dim);">23 ITEMS</span>
+                </div>
+                <div class="module-nav-list" id="module-nav-list">
+                    <!-- Dynamic categories and modules populated via JavaScript -->
+                </div>
+            </div>
+
+            <!-- Center Stage: High-Def Interactive Viewport -->
+            <div class="arena-container">
+                <div class="viewport-header-overlay">
+                    <div class="viewport-tag" id="active-module-title">ACTIVE MODULE</div>
+                    <span style="color: #444;">|</span>
+                    <div style="font-size: 0.7rem; color: #aaa;" id="canvas-resolution-tag">ZOOM: 2.5x</div>
+                </div>
+
+                <canvas id="physics-canvas"></canvas>
+            </div>
+
+            <!-- Right Sidebar: Tactical Briefing & Live Stats -->
+            <div class="player-box">
+                <div class="pane-title">
+                    <span>TACTICAL BRIEFING</span>
+                    <span style="color: var(--accent-cyan); font-size: 0.7rem;">LIVE</span>
+                </div>
+
+                <!-- Stats Lines -->
+                <div class="stat-line">
+                    <span class="stat-label">CLASS NAME:</span>
+                    <span class="stat-value cyan" id="stat-class-name">--</span>
+                </div>
+                <div class="stat-line">
+                    <span class="stat-label">CATEGORY:</span>
+                    <span class="stat-value" id="stat-category">--</span>
+                </div>
+                <div class="stat-line">
+                    <span class="stat-label">DIMENSIONS:</span>
+                    <span class="stat-value" id="stat-dimensions">--</span>
+                </div>
+                <div class="stat-line">
+                    <span class="stat-label">SIMULATION FPS:</span>
+                    <span class="stat-value green" id="stat-fps">60 FPS</span>
+                </div>
+                <div class="stat-line">
+                    <span class="stat-label">ACTIVE PARTICLES:</span>
+                    <span class="stat-value magenta" id="stat-particles">0</span>
+                </div>
+
+                <!-- Module Interactive Tuning -->
+                <div style="margin-top: 6px;">
+                    <div style="font-size: 0.7rem; color: var(--accent-green); margin-bottom: 4px; letter-spacing: 1px;">MODULE CONTROLS</div>
+                    <div class="param-box" id="dynamic-params-container">
+                        <!-- Dynamic toggles/sliders for active module -->
+                    </div>
+                </div>
+
+                <!-- Detailed Mechanics & Tournament Strategy -->
+                <div style="margin-top: 8px; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                    <div style="font-size: 0.7rem; color: var(--accent-green); letter-spacing: 1px; margin-bottom: 2px;">MECHANICS & STRATEGY</div>
+                    <div class="tactical-desc" id="tactical-description">
+                        Select a module from the left directory to analyze its visual representation, collision geometry, force fields, and tournament strategic value.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Controls Bar -->
+        <div class="controls-bar">
+            <div class="btn-group">
+                <button class="start-btn pulse-green" id="btn-toggle-stream">
+                    <span>STREAM TEST PARTICLES</span>
+                </button>
+                <button class="load-btn" id="btn-fire-burst">BURST (x20)</button>
+                <button class="load-btn" id="btn-clear-particles">CLEAR ARENA</button>
+            </div>
+
+            <span style="color: #444;">|</span>
+
+            <div class="btn-group">
+                <button class="help-btn" id="btn-zoom-in">ZOOM +</button>
+                <button class="help-btn" id="btn-zoom-out">ZOOM -</button>
+                <button class="opt-btn" id="btn-reset-view">RESET VIEW</button>
+            </div>
+
+            <div class="slider-container">
+                <span>SIM SPEED:</span>
+                <input type="range" id="sim-speed-slider" min="0" max="2" step="0.25" value="1">
+                <span id="speed-val-label" style="width: 32px; color: #fff;">1.0x</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN ENGINE & MODULE IMPLEMENTATIONS -->
+    <script>
+        // --- CORE MATH & UTILS ---
+        function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+        // --- PARTICLE CLASS ---
+        class Particle {
+            constructor(x, y, vx, vy, color = '#00ffff') {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = 3.5;
+                this.color = color;
+                this.charge = 1; // +1 positive, -1 negative
+                this.life = 1.0;
+                this.history = [];
+            }
+
+            update(dt) {
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > 8) this.history.shift();
+
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+            }
+
+            draw(ctx) {
+                // Trail
+                if (this.history.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.history[0].x, this.history[0].y);
+                    for (let i = 1; i < this.history.length; i++) {
+                        ctx.lineTo(this.history[i].x, this.history[i].y);
+                    }
+                    ctx.strokeStyle = this.color;
+                    ctx.globalAlpha = 0.25;
+                    ctx.lineWidth = this.radius;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // Core Particle
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.charge > 0 ? '#00e1ff' : '#ff3366';
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- ABSTRACT BASE MODULE ---
+        class ArenaModule {
+            constructor(x, y, width, height, title = "Base Module") {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.title = title;
+                this.selected = false;
+            }
+
+            get center() {
+                return { x: this.x + this.width / 2, y: this.y + this.height / 2 };
+            }
+
+            containsPoint(px, py) {
+                return px >= this.x && px <= this.x + this.width &&
+                       py >= this.y && py <= this.y + this.height;
+            }
+
+            update(dt, particles) {
+                // Override in subclasses
+            }
+
+            draw(ctx) {
+                ctx.save();
+                if (this.selected) {
+                    ctx.strokeStyle = '#00ffff';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = '#00ffff';
+                    ctx.shadowBlur = 10;
+                    ctx.strokeRect(this.x - 3, this.y - 3, this.width + 6, this.height + 6);
+                } else {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(this.x, this.y, this.width, this.height);
+                }
+                ctx.restore();
+            }
+
+            handleParticleCollision(p) {
+                // Default Elastic Box Collision
+                if (this.containsPoint(p.x, p.y)) {
+                    // Simple rebound from box center direction
+                    const c = this.center;
+                    const dx = p.x - c.x;
+                    const dy = p.y - c.y;
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        p.vx *= -1;
+                        p.x += Math.sign(dx) * 4;
+                    } else {
+                        p.vy *= -1;
+                        p.y += Math.sign(dy) * 4;
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // MODULE IMPLEMENTATIONS (23 DISTINCT MODULES)
+        // ==========================================
+
+        class SourceSpawnModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 90, 90, "Source Spawn Module");
+                this.spawnTimer = 0;
+                this.golGrid = Array(6).fill(0).map(() => Array(6).fill(0).map(() => Math.random() > 0.6 ? 1 : 0));
+                this.golTimer = 0;
+            }
+
+            update(dt, particles) {
+                this.golTimer += dt;
+                if (this.golTimer > 0.3) {
+                    this.golTimer = 0;
+                    // Tick simple Game of Life pattern
+                    let next = this.golGrid.map(row => [...row]);
+                    for (let r = 0; r < 6; r++) {
+                        for (let c = 0; c < 6; c++) {
+                            let n = 0;
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    if (dr === 0 && dc === 0) continue;
+                                    let nr = (r + dr + 6) % 6, nc = (c + dc + 6) % 6;
+                                    if (this.golGrid[nr][nc]) n++;
+                                }
+                            }
+                            if (this.golGrid[r][c] === 1 && (n < 2 || n > 3)) next[r][c] = 0;
+                            else if (this.golGrid[r][c] === 0 && n === 3) next[r][c] = 1;
+                        }
+                    }
+                    this.golGrid = next;
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                
+                // Draw GOL visual matrix background
+                const cw = this.width / 6, ch = this.height / 6;
+                for (let r = 0; r < 6; r++) {
+                    for (let cidx = 0; cidx < 6; cidx++) {
+                        if (this.golGrid[r][cidx]) {
+                            ctx.fillStyle = 'rgba(66, 244, 133, 0.25)';
+                            ctx.fillRect(this.x + cidx * cw, this.y + r * ch, cw - 1, ch - 1);
+                        }
+                    }
+                }
+
+                // Core spawn pulse point
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 16, 0, Math.PI * 2);
+                ctx.fillStyle = '#42f485';
+                ctx.shadowColor = '#42f485';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('SPAWN', c.x, c.y);
+                ctx.restore();
+            }
+        }
+
+        class AttractorModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 100, 100, "Gravitational Attractor");
+                this.strength = 12000;
+                this.pulse = 0;
+            }
+
+            update(dt, particles) {
+                this.pulse += dt * 3;
+                const c = this.center;
+                for (let p of particles) {
+                    const dx = c.x - p.x;
+                    const dy = c.y - p.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq > 100 && distSq < 40000) {
+                        const force = this.strength / distSq;
+                        const dist = Math.sqrt(distSq);
+                        p.vx += (dx / dist) * force * dt;
+                        p.vy += (dy / dist) * force * dt;
+                    }
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                
+                // Pulsing field rings
+                const ringR = (Math.sin(this.pulse) * 0.5 + 0.5) * 35 + 10;
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, ringR, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 12, 0, Math.PI * 2);
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 12;
+                ctx.fill();
+
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 12px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('G', c.x, c.y);
+                ctx.restore();
+            }
+        }
+
+        class SinkModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 90, 90, "Drain Sink");
+                this.angle = 0;
+            }
+
+            update(dt, particles) {
+                this.angle += dt * 4;
+                const c = this.center;
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let p = particles[i];
+                    let dist = Math.hypot(p.x - c.x, p.y - c.y);
+                    if (dist < 22) {
+                        particles.splice(i, 1); // Consume particle
+                    } else if (dist < 120) {
+                        p.vx += (c.x - p.x) * dt * 3;
+                        p.vy += (c.y - p.y) * dt * 3;
+                    }
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.translate(c.x, c.y);
+                ctx.rotate(this.angle);
+
+                // Spiral vortex look
+                ctx.beginPath();
+                for (let i = 0; i < 3; i++) {
+                    const rot = (i * Math.PI * 2) / 3;
+                    ctx.arc(0, 0, 24, rot, rot + 1.2);
+                }
+                ctx.strokeStyle = '#ff3333';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#ff3333';
+                ctx.shadowBlur = 10;
+                ctx.stroke();
+
+                ctx.restore();
+
+                ctx.fillStyle = '#ff3333';
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('DRAIN SINK', c.x, c.y + 36);
+            }
+        }
+
+        class QCDInverterModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 100, 100, "QCD Color Inverter");
+            }
+
+            handleParticleCollision(p) {
+                if (this.containsPoint(p.x, p.y)) {
+                    p.charge *= -1;
+                    p.color = p.charge > 0 ? '#00e1ff' : '#ff3366';
+                    // Rebound slightly to avoid multiple instant swaps
+                    p.vx *= -1.1;
+                    p.vy *= -1.1;
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 35, 0, Math.PI * 2);
+                ctx.strokeStyle = '#e040fb';
+                ctx.setLineDash([6, 4]);
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#e040fb';
+                ctx.shadowBlur = 12;
+                ctx.stroke();
+
+                ctx.fillStyle = '#e040fb';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('QCD SWAP', c.x, c.y);
+                ctx.restore();
+            }
+        }
+
+        class DoublerModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 80, 80, "Particle Doubler");
+                this.cooldown = 0;
+            }
+
+            update(dt) {
+                if (this.cooldown > 0) this.cooldown -= dt;
+            }
+
+            handleParticleCollision(p, particles) {
+                if (this.cooldown <= 0 && this.containsPoint(p.x, p.y) && particles.length < 300) {
+                    this.cooldown = 0.15;
+                    // Spawn duplicate particle
+                    const dup = new Particle(p.x + 5, p.y + 5, -p.vx * 0.9, -p.vy * 0.9, p.color);
+                    dup.charge = p.charge;
+                    particles.push(dup);
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                ctx.fillStyle = '#ffd700';
+                ctx.font = 'bold 18px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 8;
+                ctx.fillText('x2', c.x, c.y);
+                ctx.restore();
+            }
+        }
+
+        class ChargerModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 90, 90, "Ionization Charger");
+                this.targetCharge = 1;
+            }
+
+            handleParticleCollision(p) {
+                if (this.containsPoint(p.x, p.y)) {
+                    p.charge = this.targetCharge;
+                    p.color = this.targetCharge > 0 ? '#00e1ff' : '#ff3366';
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                const col = this.targetCharge > 0 ? '#00e1ff' : '#ff3366';
+                ctx.strokeStyle = col;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x + 10, this.y + 10, this.width - 20, this.height - 20);
+
+                ctx.fillStyle = col;
+                ctx.font = 'bold 16px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = col;
+                ctx.shadowBlur = 10;
+                ctx.fillText(this.targetCharge > 0 ? '+ ION' : '- ION', c.x, c.y);
+                ctx.restore();
+            }
+        }
+
+        class CapacitorModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 110, 60, "Capacitor Array");
+                this.storedCharge = 0;
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.save();
+                // Draw parallel plates
+                ctx.fillStyle = '#00e1ff';
+                ctx.fillRect(this.x + 10, this.y + 10, this.width - 20, 8);
+                ctx.fillStyle = '#ff3366';
+                ctx.fillRect(this.x + 10, this.y + this.height - 18, this.width - 20, 8);
+
+                ctx.fillStyle = '#aaa';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('CAPACITOR FIELD', this.center.x, this.center.y);
+                ctx.restore();
+            }
+        }
+
+        class KineticConverterModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 100, 70, "Kinetic Converter");
+                this.multiplier = 1.6;
+            }
+
+            handleParticleCollision(p) {
+                if (this.containsPoint(p.x, p.y)) {
+                    p.vx *= this.multiplier;
+                    p.vy *= this.multiplier;
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.strokeStyle = '#ff9800';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                // Chevron arrows
+                ctx.moveTo(c.x - 20, c.y + 10); ctx.lineTo(c.x, c.y - 10); ctx.lineTo(c.x + 20, c.y + 10);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ff9800';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('ACCELERATOR', c.x, c.y + 22);
+                ctx.restore();
+            }
+        }
+
+        class BricksModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 100, 100, "Breakable Bricks");
+                this.rows = 4;
+                this.cols = 4;
+                this.grid = Array(16).fill(true);
+            }
+
+            handleParticleCollision(p) {
+                const bw = this.width / this.cols;
+                const bh = this.height / this.rows;
+
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        const idx = r * this.cols + c;
+                        if (!this.grid[idx]) continue;
+
+                        const bx = this.x + c * bw;
+                        const by = this.y + r * bh;
+
+                        if (p.x >= bx && p.x <= bx + bw && p.y >= by && p.y <= by + bh) {
+                            this.grid[idx] = false; // Destroy brick
+                            p.vy *= -1;
+                            return;
+                        }
+                    }
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const bw = this.width / this.cols;
+                const bh = this.height / this.rows;
+
+                ctx.save();
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        if (this.grid[r * this.cols + c]) {
+                            ctx.fillStyle = '#2a2d32';
+                            ctx.strokeStyle = '#42f485';
+                            ctx.lineWidth = 1;
+                            ctx.fillRect(this.x + c * bw + 1, this.y + r * bh + 1, bw - 2, bh - 2);
+                            ctx.strokeRect(this.x + c * bw + 1, this.y + r * bh + 1, bw - 2, bh - 2);
+                        }
+                    }
+                }
+                ctx.restore();
+            }
+        }
+
+        class MagnetizerModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 90, 90, "Magnetic Deflector");
+            }
+
+            update(dt, particles) {
+                const c = this.center;
+                for (let p of particles) {
+                    let dx = p.x - c.x, dy = p.y - c.y;
+                    let dist = Math.hypot(dx, dy);
+                    if (dist < 80) {
+                        // Apply Lorenz-like tangential magnetic force
+                        p.vx += -dy * dt * 8;
+                        p.vy += dx * dt * 8;
+                    }
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 30, 0, Math.PI * 2);
+                ctx.strokeStyle = '#e040fb';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#e040fb';
+                ctx.shadowBlur = 10;
+                ctx.stroke();
+
+                ctx.fillStyle = '#e040fb';
+                ctx.font = 'bold 12px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('MAG', c.x, c.y);
+                ctx.restore();
+            }
+        }
+
+        class PaddleWheelModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 100, 100, "Rotary Paddle Wheel");
+                this.angle = 0;
+                this.speed = 2;
+            }
+
+            update(dt) {
+                this.angle += this.speed * dt;
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.translate(c.x, c.y);
+                ctx.rotate(this.angle);
+
+                ctx.strokeStyle = '#42f485';
+                ctx.lineWidth = 3;
+                for (let i = 0; i < 6; i++) {
+                    ctx.rotate(Math.PI / 3);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, 38);
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        class WedgeModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 90, 90, "Deflection Wedge");
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.height);
+                ctx.lineTo(this.x + this.width, this.y + this.height);
+                ctx.lineTo(this.x + this.width / 2, this.y);
+                ctx.closePath();
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 2;
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class BlockSmallModule extends ArenaModule {
+            constructor(x, y) { super(x, y, 50, 50, "Small Barrier Block"); }
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.fillStyle = '#333';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        class BlockModule extends ArenaModule {
+            constructor(x, y) { super(x, y, 100, 100, "Large Barrier Block"); }
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.fillStyle = '#222';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        class BarHModule extends ArenaModule {
+            constructor(x, y) { super(x, y, 140, 25, "Horizontal Barrier Bar"); }
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.fillStyle = '#444';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        class BarVModule extends ArenaModule {
+            constructor(x, y) { super(x, y, 25, 140, "Vertical Barrier Bar"); }
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.fillStyle = '#444';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        class OsmosisModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 110, 110, "Semi-Permeable Osmosis");
+            }
+
+            handleParticleCollision(p) {
+                // Pass positive particles, bounce negative ones
+                if (this.containsPoint(p.x, p.y) && p.charge < 0) {
+                    p.vx *= -1;
+                    p.vy *= -1;
+                }
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 225, 255, 0.08)';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                ctx.strokeStyle = '#00e1ff';
+                ctx.setLineDash([4, 4]);
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+                ctx.fillStyle = '#00e1ff';
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('+ PASS ONLY', this.center.x, this.center.y);
+                ctx.restore();
+            }
+        }
+
+        class PredatorModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 90, 90, "Predator Sentinel");
+                this.target = null;
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 25, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 51, 51, 0.2)';
+                ctx.strokeStyle = '#ff3333';
+                ctx.lineWidth = 2;
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#ff3333';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('SENTINEL', c.x, c.y + 4);
+                ctx.restore();
+            }
+        }
+
+        class CircleObstacleModule extends ArenaModule {
+            constructor(x, y) { super(x, y, 90, 90, "Circular Bumper"); }
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 40, 0, Math.PI * 2);
+                ctx.fillStyle = '#1a1a1a';
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 3;
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class GirderSlantRightModule extends ArenaModule {
+            constructor(x, y) { super(x, y, 120, 40, "Slanted Girder Right"); }
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.save();
+                ctx.fillStyle = '#3a3a3a';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.height);
+                ctx.lineTo(this.x + 30, this.y);
+                ctx.lineTo(this.x + this.width, this.y);
+                ctx.lineTo(this.x + this.width - 30, this.y + this.height);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#ff9800';
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class GirderSlantLeftModule extends ArenaModule {
+            constructor(x, y) { super(x, y, 120, 40, "Slanted Girder Left"); }
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.save();
+                ctx.fillStyle = '#3a3a3a';
+                ctx.beginPath();
+                ctx.moveTo(this.x + 30, this.y + this.height);
+                ctx.lineTo(this.x, this.y);
+                ctx.lineTo(this.x + this.width - 30, this.y);
+                ctx.lineTo(this.x + this.width, this.y + this.height);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#ff9800';
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class MazeModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 120, 120, "Dynamic Maze Grid");
+            }
+            draw(ctx) {
+                super.draw(ctx);
+                ctx.save();
+                ctx.strokeStyle = '#42f485';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x + 10, this.y + 10, 40, 40);
+                ctx.strokeRect(this.x + 70, this.y + 10, 40, 40);
+                ctx.strokeRect(this.x + 40, this.y + 70, 40, 40);
+                ctx.restore();
+            }
+        }
+
+        class FlipModule extends ArenaModule {
+            constructor(x, y) {
+                super(x, y, 100, 100, "Flip Barrier");
+                this.flipped = false;
+                this.timer = 0;
+            }
+            update(dt) {
+                this.timer += dt;
+                if (this.timer > 2) {
+                    this.timer = 0;
+                    this.flipped = !this.flipped;
+                }
+            }
+            draw(ctx) {
+                super.draw(ctx);
+                const c = this.center;
+                ctx.save();
+                ctx.translate(c.x, c.y);
+                if (this.flipped) ctx.rotate(Math.PI / 2);
+
+                ctx.strokeStyle = '#ff3333';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(-35, 0); ctx.lineTo(35, 0);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+
+        // ==========================================
+        // MODULE REGISTRY & CATALOG DATA
+        // ==========================================
+
+        const MODULE_REGISTRY = [
+            {
+                category: "EMITTERS & SINKS",
+                items: [
+                    {
+                        className: "SourceSpawnModule",
+                        name: "Source Spawn",
+                        factory: (x, y) => new SourceSpawnModule(x, y),
+                        description: "Centralized particle generator equipped with an active cellular automata GOL matrix preview. Serves as the primary point of origin for tournament particle streams."
+                    },
+                    {
+                        className: "SinkModule",
+                        name: "Drain Sink",
+                        factory: (x, y) => new SinkModule(x, y),
+                        description: "Gravitational whirlpool black-hole sink that draws nearby stray particles inward and immediately consumes them upon contact."
+                    },
+                    {
+                        className: "OsmosisModule",
+                        name: "Osmosis Barrier",
+                        factory: (x, y) => new OsmosisModule(x, y),
+                        description: "Semi-permeable membrane filter that allows positively charged (+ION) particles to pass through unhindered while deflecting negatively charged ones."
+                    }
+                ]
+            },
+            {
+                category: "FORCE & CHARGE FIELDS",
+                items: [
+                    {
+                        className: "AttractorModule",
+                        name: "Gravitational Attractor",
+                        factory: (x, y) => new AttractorModule(x, y),
+                        description: "Emits a strong centripetal gravitational field pulling nearby particles towards its center core, warping trajectory paths into curved orbits."
+                    },
+                    {
+                        className: "QCDInverterModule",
+                        name: "QCD Color Inverter",
+                        factory: (x, y) => new QCDInverterModule(x, y),
+                        description: "Quantum Chromodynamics inverter field. Inverts particle charge polarity (+ION to -ION and vice versa) upon boundary contact."
+                    },
+                    {
+                        className: "ChargerModule",
+                        name: "Ionization Charger",
+                        factory: (x, y) => new ChargerModule(x, y),
+                        description: "Forces passing particles into a uniform target polarity charge, instantly adapting their color hue and electrostatic properties."
+                    },
+                    {
+                        className: "CapacitorModule",
+                        name: "Capacitor Array",
+                        factory: (x, y) => new CapacitorModule(x, y),
+                        description: "Dual parallel plate module creating a localized electrostatic field differential capable of steering streams."
+                    },
+                    {
+                        className: "MagnetizerModule",
+                        name: "Magnetic Deflector",
+                        factory: (x, y) => new MagnetizerModule(x, y),
+                        description: "Generates a localized Lorentz-type circular magnetic torque field, forcing particles into continuous spiral orbits."
+                    },
+                    {
+                        className: "KineticConverterModule",
+                        name: "Kinetic Accelerator",
+                        factory: (x, y) => new KineticConverterModule(x, y),
+                        description: "High-energy kinetic booster field that imparts significant linear velocity acceleration to passing particles."
+                    }
+                ]
+            },
+            {
+                category: "MECHANICAL & DYNAMIC",
+                items: [
+                    {
+                        className: "DoublerModule",
+                        name: "Particle Doubler",
+                        factory: (x, y) => new DoublerModule(x, y),
+                        description: "Cloning chamber that duplicates passing particles in real-time, instantly doubling particle density in tactical choke points."
+                    },
+                    {
+                        className: "PaddleWheelModule",
+                        name: "Rotary Paddle Wheel",
+                        factory: (x, y) => new PaddleWheelModule(x, y),
+                        description: "Motorized rotating mechanical paddle wheel that physically strikes and deflects oncoming particle streams."
+                    },
+                    {
+                        className: "BricksModule",
+                        name: "Breakable Bricks",
+                        factory: (x, y) => new BricksModule(x, y),
+                        description: "Procedural breakable 4x4 brick wall array. Particles destroy individual brick cells upon impact to carve out open pathways."
+                    },
+                    {
+                        className: "FlipModule",
+                        name: "Flip Barrier",
+                        factory: (x, y) => new FlipModule(x, y),
+                        description: "Timer-based motorized line barrier that periodically flips 90 degrees to alter arena flow channels dynamically."
+                    },
+                    {
+                        className: "MazeModule",
+                        name: "Dynamic Maze Grid",
+                        factory: (x, y) => new MazeModule(x, y),
+                        description: "Complex barrier cluster that forces particle streams into narrow sub-channels."
+                    },
+                    {
+                        className: "PredatorModule",
+                        name: "Predator Sentinel",
+                        factory: (x, y) => new PredatorModule(x, y),
+                        description: "Autonomous guardian module designed to disrupt dense particle clusters."
+                    }
+                ]
+            },
+            {
+                category: "BARRIERS & GEOMETRY",
+                items: [
+                    {
+                        className: "WedgeModule",
+                        name: "Deflection Wedge",
+                        factory: (x, y) => new WedgeModule(x, y),
+                        description: "Angled triangular prism block used to split particle streams cleanly into dual opposite directions."
+                    },
+                    {
+                        className: "BlockSmallModule",
+                        name: "Small Barrier Block",
+                        factory: (x, y) => new BlockSmallModule(x, y),
+                        description: "Compact solid barrier block for micro deflection adjustments."
+                    },
+                    {
+                        className: "BlockModule",
+                        name: "Large Barrier Block",
+                        factory: (x, y) => new BlockModule(x, y),
+                        description: "Heavy solid concrete barrier block for complete obstruction of arena paths."
+                    },
+                    {
+                        className: "BarHModule",
+                        name: "Horizontal Barrier Bar",
+                        factory: (x, y) => new BarHModule(x, y),
+                        description: "Elongated horizontal deflection wall line."
+                    },
+                    {
+                        className: "BarVModule",
+                        name: "Vertical Barrier Bar",
+                        factory: (x, y) => new BarVModule(x, y),
+                        description: "Elongated vertical deflection wall line."
+                    },
+                    {
+                        className: "CircleObstacleModule",
+                        name: "Circular Bumper",
+                        factory: (x, y) => new CircleObstacleModule(x, y),
+                        description: "Smooth circular elastic bumper pinball obstacle."
+                    },
+                    {
+                        className: "GirderSlantRightModule",
+                        name: "Slanted Girder Right",
+                        factory: (x, y) => new GirderSlantRightModule(x, y),
+                        description: "Industrial steel girder angled at 45 degrees to the right."
+                    },
+                    {
+                        className: "GirderSlantLeftModule",
+                        name: "Slanted Girder Left",
+                        factory: (x, y) => new GirderSlantLeftModule(x, y),
+                        description: "Industrial steel girder angled at 45 degrees to the left."
+                    }
+                ]
+            }
+        ];
+
+
+        // ==========================================
+        // APP CONTROLLER & CANVAS VIEWPORT ENGINE
+        // ==========================================
+
+        class ShowcaseApp {
+            constructor() {
+                this.canvas = document.getElementById('physics-canvas');
+                this.ctx = this.canvas.getContext('2d');
+
+                this.activeModuleData = null;
+                this.activeModuleInstance = null;
+                this.particles = [];
+
+                this.zoomScale = 2.5;
+                this.simSpeed = 1.0;
+                this.isStreaming = false;
+                this.streamTimer = 0;
+
+                this.lastTime = performance.now();
+                this.fps = 60;
+
+                this.initUI();
+                this.resizeCanvas();
+                this.selectModule(MODULE_REGISTRY[0].items[0]);
+
+                window.addEventListener('resize', () => this.resizeCanvas());
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            resizeCanvas() {
+                const container = this.canvas.parentElement;
+                this.canvas.width = container.clientWidth;
+                this.canvas.height = container.clientHeight;
+                if (this.activeModuleInstance) {
+                    this.centerActiveModule();
+                }
+            }
+
+            centerActiveModule() {
+                if (!this.activeModuleInstance) return;
+                const cw = this.canvas.width / this.zoomScale;
+                const ch = this.canvas.height / this.zoomScale;
+                this.activeModuleInstance.x = (cw - this.activeModuleInstance.width) / 2;
+                this.activeModuleInstance.y = (ch - this.activeModuleInstance.height) / 2;
+            }
+
+            initUI() {
+                // Populate Module Browser Directory List
+                const navContainer = document.getElementById('module-nav-list');
+                navContainer.innerHTML = '';
+
+                MODULE_REGISTRY.forEach(cat => {
+                    const catHeader = document.createElement('div');
+                    catHeader.className = 'nav-category';
+                    catHeader.innerText = cat.category;
+                    navContainer.appendChild(catHeader);
+
+                    cat.items.forEach(item => {
+                        const btn = document.createElement('button');
+                        btn.className = 'module-item-btn';
+                        btn.innerHTML = `<span>${item.name}</span><span style="font-size: 0.65rem; color: #666;">${item.className}</span>`;
+                        btn.onclick = () => this.selectModule(item, btn);
+                        btn.id = `nav-btn-${item.className}`;
+                        navContainer.appendChild(btn);
+                    });
+                });
+
+                // Spawner & Canvas Controls
+                document.getElementById('btn-toggle-stream').onclick = () => {
+                    this.isStreaming = !this.isStreaming;
+                    const btn = document.getElementById('btn-toggle-stream');
+                    if (this.isStreaming) {
+                        btn.classList.add('active-spawner');
+                        btn.innerHTML = '<span>STOP STREAMING</span>';
+                    } else {
+                        btn.classList.remove('active-spawner');
+                        btn.innerHTML = '<span>STREAM TEST PARTICLES</span>';
+                    }
+                };
+
+                document.getElementById('btn-fire-burst').onclick = () => this.fireParticleBurst(20);
+                document.getElementById('btn-clear-particles').onclick = () => { this.particles = []; };
+
+                document.getElementById('btn-zoom-in').onclick = () => {
+                    this.zoomScale = Math.min(4.5, this.zoomScale + 0.5);
+                    this.updateZoomLabel();
+                    this.centerActiveModule();
+                };
+
+                document.getElementById('btn-zoom-out').onclick = () => {
+                    this.zoomScale = Math.max(1.0, this.zoomScale - 0.5);
+                    this.updateZoomLabel();
+                    this.centerActiveModule();
+                };
+
+                document.getElementById('btn-reset-view').onclick = () => {
+                    this.zoomScale = 2.5;
+                    this.updateZoomLabel();
+                    this.centerActiveModule();
+                };
+
+                const slider = document.getElementById('sim-speed-slider');
+                slider.oninput = (e) => {
+                    this.simSpeed = parseFloat(e.target.value);
+                    document.getElementById('speed-val-label').innerText = `${this.simSpeed.toFixed(1)}x`;
+                };
+
+                // Interactive Click on Canvas to launch particle towards module
+                this.canvas.onclick = (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const clickX = (e.clientX - rect.left) / this.zoomScale;
+                    const clickY = (e.clientY - rect.top) / this.zoomScale;
+
+                    if (this.activeModuleInstance) {
+                        const mc = this.activeModuleInstance.center;
+                        const angle = Math.atan2(mc.y - clickY, mc.x - clickX);
+                        const speed = 120;
+                        this.particles.push(new Particle(
+                            clickX, clickY,
+                            Math.cos(angle) * speed,
+                            Math.sin(angle) * speed
+                        ));
+                    }
+                };
+            }
+
+            updateZoomLabel() {
+                document.getElementById('canvas-resolution-tag').innerText = `ZOOM: ${this.zoomScale.toFixed(1)}x`;
+            }
+
+            selectModule(itemData, targetBtn = null) {
+                this.activeModuleData = itemData;
+                // Instantiate clean module instance
+                this.activeModuleInstance = itemData.factory(0, 0);
+                this.activeModuleInstance.selected = true;
+                this.centerActiveModule();
+
+                // Clear particles
+                this.particles = [];
+
+                // Update UI Sidebar highlight
+                document.querySelectorAll('.module-item-btn').forEach(b => b.classList.remove('active'));
+                const activeBtn = targetBtn || document.getElementById(`nav-btn-${itemData.className}`);
+                if (activeBtn) activeBtn.classList.add('active');
+
+                // Update Header Tag
+                document.getElementById('active-module-title').innerText = itemData.name.toUpperCase();
+
+                // Update Tactical Info Panel
+                document.getElementById('stat-class-name').innerText = itemData.className;
+                
+                // Find category
+                let catName = "GENERAL";
+                MODULE_REGISTRY.forEach(c => {
+                    if (c.items.some(i => i.className === itemData.className)) catName = c.category;
+                });
+                document.getElementById('stat-category').innerText = catName;
+
+                document.getElementById('stat-dimensions').innerText = `${this.activeModuleInstance.width} x ${this.activeModuleInstance.height} PX`;
+                document.getElementById('tactical-description').innerText = itemData.description;
+
+                // Build Custom Module Parameter Controls
+                this.buildParamControls();
+            }
+
+            buildParamControls() {
+                const container = document.getElementById('dynamic-params-container');
+                container.innerHTML = '';
+
+                const mod = this.activeModuleInstance;
+
+                if (mod instanceof ChargerModule) {
+                    const row = document.createElement('div');
+                    row.className = 'param-row';
+                    row.innerHTML = `<span>TARGET CHARGE:</span>`;
+                    const btn = document.createElement('button');
+                    btn.className = 'toggle-btn on';
+                    btn.innerText = '+ ION (CYAN)';
+                    btn.onclick = () => {
+                        mod.targetCharge = mod.targetCharge > 0 ? -1 : 1;
+                        btn.innerText = mod.targetCharge > 0 ? '+ ION (CYAN)' : '- ION (PINK)';
+                    };
+                    row.appendChild(btn);
+                    container.appendChild(row);
+                } else if (mod instanceof PaddleWheelModule) {
+                    const row = document.createElement('div');
+                    row.className = 'param-row';
+                    row.innerHTML = `<span>ROTATION SPEED:</span>`;
+                    const btn = document.createElement('button');
+                    btn.className = 'toggle-btn on';
+                    btn.innerText = 'FAST';
+                    btn.onclick = () => {
+                        mod.speed = mod.speed === 2 ? 6 : 2;
+                        btn.innerText = mod.speed === 6 ? 'TURBO' : 'FAST';
+                    };
+                    row.appendChild(btn);
+                    container.appendChild(row);
+                } else {
+                    container.innerHTML = `<span style="font-size: 0.7rem; color: #666;">No dynamic parameters for this module class.</span>`;
+                }
+            }
+
+            fireParticleBurst(count) {
+                if (!this.activeModuleInstance) return;
+                const c = this.activeModuleInstance.center;
+
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 * i) / count;
+                    const spawnDist = 140;
+                    const px = c.x + Math.cos(angle) * spawnDist;
+                    const py = c.y + Math.sin(angle) * spawnDist;
+                    const speed = 100 + Math.random() * 40;
+
+                    this.particles.push(new Particle(
+                        px, py,
+                        -Math.cos(angle) * speed,
+                        -Math.sin(angle) * speed
+                    ));
+                }
+            }
+
+            loop(timestamp) {
+                const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1) * this.simSpeed;
+                this.lastTime = timestamp;
+                this.fps = Math.round(1 / (dt / (this.simSpeed || 1) || 0.016));
+
+                this.update(dt);
+                this.render();
+
+                // Live UI updates
+                document.getElementById('stat-fps').innerText = `${this.fps} FPS`;
+                document.getElementById('stat-particles').innerText = this.particles.length;
+
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            update(dt) {
+                if (!this.activeModuleInstance) return;
+
+                // Stream Spawner
+                if (this.isStreaming) {
+                    this.streamTimer += dt;
+                    if (this.streamTimer > 0.12) {
+                        this.streamTimer = 0;
+                        const c = this.activeModuleInstance.center;
+                        // Spawn from top left stream path
+                        this.particles.push(new Particle(
+                            c.x - 120, c.y - 120,
+                            80 + Math.random() * 20, 80 + Math.random() * 20
+                        ));
+                    }
+                }
+
+                // Update Module Logic
+                this.activeModuleInstance.update(dt, this.particles);
+
+                // Update Particles & Collisions
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    let p = this.particles[i];
+                    p.update(dt);
+
+                    // Module Collisions
+                    if (this.activeModuleInstance.handleParticleCollision) {
+                        this.activeModuleInstance.handleParticleCollision(p, this.particles);
+                    } else {
+                        this.activeModuleInstance.handleParticleCollision(p);
+                    }
+
+                    // Boundary checks based on zoomed canvas area
+                    const maxW = this.canvas.width / this.zoomScale;
+                    const maxH = this.canvas.height / this.zoomScale;
+
+                    if (p.x < 0 || p.x > maxW || p.y < 0 || p.y > maxH) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+
+            render() {
+                // Clear Canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.ctx.save();
+                // Apply High-Def Zoom Scale Transformation
+                this.ctx.scale(this.zoomScale, this.zoomScale);
+
+                // Draw Background Grid Lines
+                this.drawBackgroundGrid();
+
+                // Draw Active Module
+                if (this.activeModuleInstance) {
+                    this.activeModuleInstance.draw(this.ctx);
+                }
+
+                // Draw Particles
+                for (let p of this.particles) {
+                    p.draw(this.ctx);
+                }
+
+                this.ctx.restore();
+            }
+
+            drawBackgroundGrid() {
+                const w = this.canvas.width / this.zoomScale;
+                const h = this.canvas.height / this.zoomScale;
+                const gridSize = 20;
+
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+                this.ctx.lineWidth = 1;
+
+                this.ctx.beginPath();
+                for (let x = 0; x <= w; x += gridSize) {
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, h);
+                }
+                for (let y = 0; y <= h; y += gridSize) {
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(w, y);
+                }
+                this.ctx.stroke();
+            }
+        }
+
+        // --- LAUNCH APPLICATION ON WINDOW LOAD ---
+        window.onload = () => {
+            window.app = new ShowcaseApp();
+        };
+    </script>
+</body>
+</html>
