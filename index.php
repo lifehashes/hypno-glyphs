@@ -1127,6 +1127,15 @@
             >
         </div>
 
+        <!-- Auto-Tracking Feature Toggle -->
+        <div class="forces-row">
+            <div class="forces-row-label">
+                <label for="auto-track-btn">Side Auto-Tracking:</label>
+                <span id="auto-track-status">OFF</span>
+            </div>
+            <button class="help-btn" id="auto-track-btn" onclick="toggleAutoTracking()" style="width: 100%; margin-top: 4px;">AUTO-TRACK: OFF</button>
+        </div>
+
         <button class="help-btn" onclick="toggleForcesModal()" style="margin-top: 10px; width: 100%;">CLOSE</button>
     </div>
 </div>
@@ -1183,6 +1192,61 @@
             window.multiplierIntervalSecs = secs;
             window.MULTIPLIER_INTERVAL_MS = secs * 1000;
             if (labelElem) labelElem.innerText = `${secs}s`;
+        }
+    }
+
+    // Auto-Tracking Feature State
+    window.autoTrackingEnabled = false;
+    let autoTrackAccumulator = 0; // Tracks elapsed time in milliseconds
+
+    function toggleAutoTracking() {
+        window.autoTrackingEnabled = !window.autoTrackingEnabled;
+        const btn = document.getElementById('auto-track-btn');
+        const statusLabel = document.getElementById('auto-track-status');
+        
+        if (btn) {
+            btn.innerText = `AUTO-TRACK: ${window.autoTrackingEnabled ? 'ON' : 'OFF'}`;
+            btn.style.borderColor = window.autoTrackingEnabled ? '#00ffff' : '';
+            btn.style.color = window.autoTrackingEnabled ? '#00ffff' : '';
+        }
+        if (statusLabel) {
+            statusLabel.innerText = window.autoTrackingEnabled ? 'ON' : 'OFF';
+        }
+    }
+
+    // Define the interval duration (15 seconds in milliseconds)
+    const AUTO_TRACK_INTERVAL_MS = 15000; 
+
+    function processAutoTracking(dt) {
+        if (!window.autoTrackingEnabled) {
+            autoTrackAccumulator = 0;
+            return;
+        }
+
+        // Accumulate delta time in milliseconds
+        autoTrackAccumulator += dt * 1000;
+
+        // Check every 15 seconds
+        if (autoTrackAccumulator >= AUTO_TRACK_INTERVAL_MS) {
+            autoTrackAccumulator = 0;
+
+            // 1. Check Alpha Side
+            const alphaParticles = arena.particles.filter(p => !p.dead && p.sourceId && p.sourceId.includes('alpha'));
+            const hasTrackedAlpha = alphaParticles.some(p => p.isTracked);
+            
+            if (!hasTrackedAlpha && alphaParticles.length > 0) {
+                const randomAlpha = alphaParticles[Math.floor(Math.random() * alphaParticles.length)];
+                randomAlpha.isTracked = true;
+            }
+
+            // 2. Check Beta Side
+            const betaParticles = arena.particles.filter(p => !p.dead && p.sourceId && p.sourceId.includes('beta'));
+            const hasTrackedBeta = betaParticles.some(p => p.isTracked);
+            
+            if (!hasTrackedBeta && betaParticles.length > 0) {
+                const randomBeta = betaParticles[Math.floor(Math.random() * betaParticles.length)];
+                randomBeta.isTracked = true;
+            }
         }
     }
 

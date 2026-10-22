@@ -627,6 +627,9 @@ class ArenaManager {
         this.ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Run auto-tracking periodic check
+        processAutoTracking(dt);
+
         // 1. Update Modules
         this.modules.forEach(mod => mod.update(dt, this));
         this.handleElectrostaticInteractions();
